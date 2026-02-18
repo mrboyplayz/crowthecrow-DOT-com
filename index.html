@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pluv</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #0b0b0b;
+      }
+      #pluv {
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+        object-position: center;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <img id="pluv" alt="Pluv" />
+    <script>
+      const pluvImages = [
+        "pluv/pluv.png",
+        "pluv/pluv51.png",
+        "pluv/pluvberet.png",
+        "pluv/pluvboss.png",
+        "pluv/pluvdobro.png",
+        "pluv/pluvfancy.jpg",
+        "pluv/pluvgreen.png",
+        "pluv/pluvicible.jpg",
+        "pluv/pluvkid.jpg",
+        "pluv/pluvmad.png",
+        "pluv/pluvmajima.jpg",
+        "pluv/pluvnerd.png",
+        "pluv/pluvortego.jpg",
+        "pluv/pluvred.png",
+        "pluv/pluvsad.png",
+        "pluv/pluvyakuza.jpg"
+      ];
+
+      const randomIndex = Math.floor(Math.random() * pluvImages.length);
+      document.getElementById("pluv").src = pluvImages[randomIndex];
+    </script>
+  </body>
+</html>
