@@ -57,9 +57,24 @@
         "pluv/crowpluv.png",
         "pluv/rainbowpluv.gif",
       ];
+      async function loadExtraPluvs() {
+        try {
+          const response = await fetch("pluv/extrapluvs.txt", { cache: "no-store" });
+          const text = await response.text();
+          const data = JSON.parse(text);
+          return Array.isArray(data?.pluvs) ? data.pluvs : [];
+        } catch (error) {
+          return [];
+        }
+      }
 
-      const randomIndex = Math.floor(Math.random() * pluvImages.length);
-      document.getElementById("pluv").src = pluvImages[randomIndex];
+      (async () => {
+        const extraPluvs = await loadExtraPluvs();
+        const allPluvs = [...pluvImages, ...extraPluvs].filter(Boolean);
+        const randomIndex = Math.floor(Math.random() * allPluvs.length);
+        document.getElementById("pluv").src = allPluvs[randomIndex];
+      })();
     </script>
   </body>
+</html>
 </html>
