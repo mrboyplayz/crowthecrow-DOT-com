@@ -32,6 +32,29 @@
         display: block;
         background: #0b0b0b;
       }
+      @keyframes pluv-shake {
+        0% {
+          transform: translate(0, 0);
+        }
+        20% {
+          transform: translate(-2px, 1px);
+        }
+        40% {
+          transform: translate(2px, -1px);
+        }
+        60% {
+          transform: translate(-1px, -2px);
+        }
+        80% {
+          transform: translate(1px, 2px);
+        }
+        100% {
+          transform: translate(0, 0);
+        }
+      }
+      #pluv.shake {
+        animation: pluv-shake 0.8s infinite;
+      }
     </style>
   </head>
   <body>
@@ -97,7 +120,12 @@
       ];
 
       const randomIndex = Math.floor(Math.random() * pluvImages.length);
-      document.getElementById("pluv").src = pluvImages[randomIndex];
+      const pluvImage = pluvImages[randomIndex];
+      const pluvEl = document.getElementById("pluv");
+      pluvEl.src = pluvImage;
+      if (pluvImage.endsWith("inhiding.png")) {
+        pluvEl.classList.add("shake");
+      }
     </script>
   </body>
 </html>
