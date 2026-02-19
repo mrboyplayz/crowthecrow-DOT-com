@@ -159,6 +159,7 @@
       </div>
     </div>
     <script>
+      const STATUS_URL = "https://your-status-server.example.com/status";
       const SERVERS = [
         { name: "CROW'S ZCITY | EU 1 | OPEN", address: "45.152.160.251:25569" },
         { name: "CROW'S ZCITY | EU 2 | OPEN", address: "45.152.160.251:25648" }
@@ -174,6 +175,7 @@
       const serverListEl = document.getElementById("server-list");
 
       let selectedServer = SERVERS[0];
+      let statusCache = new Map();
 
       function setActiveServer(server) {
         selectedServer = server;
@@ -198,34 +200,66 @@
         });
       }
 
+      async function fetchStatusFeed() {
+        if (!STATUS_URL) {
+          return;
+        }
+        try {
+          const response = await fetch(STATUS_URL, { cache: "no-store" });
+          const data = await response.json();
+          const servers = Array.isArray(data)
+            ? data
+            : Array.isArray(data?.servers)
+              ? data.servers
+              : [];
+          statusCache = new Map();
+          servers.forEach((server) => {
+            const address =
+              server.address ||
+              server.ip ||
+              (server.host && server.port ? `${server.host}:${server.port}` : "");
+            if (!address) {
+              return;
+            }
+            statusCache.set(address, server);
+          });
+        } catch (error) {
+          statusCache = new Map();
+        }
+      }
+
+      function applyStatusFromFeed(server) {
+        const entry = statusCache.get(selectedServer.address);
+        if (!entry) {
+          serverNameEl.textContent = selectedServer.name;
+          playerCountEl.textContent = "—";
+          serverStatusEl.textContent = "Offline";
+          statusTextEl.textContent = "No server data found at that address.";
+          return;
+        }
+        serverNameEl.textContent = entry.name || selectedServer.name;
+        if (typeof entry.players === "number" && typeof entry.max_players === "number") {
+          playerCountEl.textContent = `${entry.players}/${entry.max_players}`;
+        } else {
+          playerCountEl.textContent = "—";
+        }
+        serverStatusEl.textContent = entry.success === false ? "Offline" : "Online";
+        statusTextEl.textContent =
+          entry.success === false ? "Server is offline." : "Server is online.";
+      }
+
       async function loadServerInfo() {
         statusTextEl.textContent = "Fetching server info…";
         serverStatusEl.textContent = "Checking";
-        try {
-          const response = await fetch(
-            `https://api.steampowered.com/ISteamApps/GetServersAtAddress/v1?addr=${encodeURIComponent(
-              selectedServer.address
-            )}`
-          );
-          const data = await response.json();
-          const server = data?.response?.servers?.[0];
-          if (!server) {
-            serverNameEl.textContent = selectedServer.name;
-            playerCountEl.textContent = "—";
-            serverStatusEl.textContent = "Offline";
-            statusTextEl.textContent = "No server data found at that address.";
-            return;
-          }
-          serverNameEl.textContent = server.name || selectedServer.name;
-          playerCountEl.textContent = `${server.players}/${server.max_players ?? "?"}`;
-          serverStatusEl.textContent = "Online :D";
-          statusTextEl.textContent = "Server is online.";
-        } catch (error) {
-          serverNameEl.textContent = selectedServer.name;
-          playerCountEl.textContent = "—";
-          serverStatusEl.textContent = "Offline 3:";
-          statusTextEl.textContent = "Failed to load server info.";
+        if (STATUS_URL) {
+          await fetchStatusFeed();
+          applyStatusFromFeed();
+          return;
         }
+        serverNameEl.textContent = selectedServer.name;
+        playerCountEl.textContent = "—";
+        serverStatusEl.textContent = "Offline";
+        statusTextEl.textContent = "Set STATUS_URL to load live data.";
       }
 
       refreshButtonEl.addEventListener("click", loadServerInfo);
