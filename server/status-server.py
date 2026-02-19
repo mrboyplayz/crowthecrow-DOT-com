@@ -1,4 +1,5 @@
 import json
+import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import a2s
 
@@ -8,7 +9,7 @@ SERVERS = [
 ]
 
 HOST = "0.0.0.0"
-PORT = 8787
+PORT = int(os.environ.get("PORT", "8787"))
 
 
 def fetch_server(server_info):
@@ -47,8 +48,11 @@ class StatusHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._write_json(204, {})
 
+    def do_HEAD(self):
+        self._write_json(204, {})
+
     def do_GET(self):
-        if self.path != "/status":
+        if self.path not in ("/", "/status"):
             self._write_json(404, {"error": "Not found"})
             return
         servers = [fetch_server(server) for server in SERVERS]
