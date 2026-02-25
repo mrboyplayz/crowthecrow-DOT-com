@@ -14,25 +14,123 @@
         height: 100%;
       }
       .page {
-        min-height: 600vh;
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
-        padding-top: 80px;
+        min-height: 700vh;
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
         font-size: 24px;
         letter-spacing: 0.08em;
       }
+      .section {
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .section span {
+        color: #000;
+        text-align: center;
+      }
+      .bottom {
+        height: 120vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+      .hell {
+        width: min(70vw, 720px);
+        opacity: 0;
+        transform: scale(0.96);
+        transition: opacity 4s ease, transform 4s ease;
+      }
+      .hell.show {
+        opacity: 1;
+        transform: scale(1);
+        animation: hell-shake 1.2s infinite;
+      }
+      .hell.intense {
+        animation: hell-shake-hard 0.15s infinite;
+      }
+      .fade {
+        position: fixed;
+        inset: 0;
+        background: #fff;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 6s ease;
+      }
+      .fade.on {
+        opacity: 1;
+      }
+      @keyframes hell-shake {
+        0% {
+          transform: translate(0, 0) scale(1);
+        }
+        25% {
+          transform: translate(-2px, 1px) scale(1);
+        }
+        50% {
+          transform: translate(2px, -1px) scale(1);
+        }
+        75% {
+          transform: translate(-1px, -2px) scale(1);
+        }
+        100% {
+          transform: translate(0, 0) scale(1);
+        }
+      }
+      @keyframes hell-shake-hard {
+        0% {
+          transform: translate(0, 0) scale(1.02);
+        }
+        20% {
+          transform: translate(-6px, 4px) scale(1.02);
+        }
+        40% {
+          transform: translate(6px, -4px) scale(1.02);
+        }
+        60% {
+          transform: translate(-5px, -6px) scale(1.02);
+        }
+        80% {
+          transform: translate(5px, 6px) scale(1.02);
+        }
+        100% {
+          transform: translate(0, 0) scale(1.02);
+        }
+      }
     </style>
   </head>
   <body>
-    <div class="page">STOP NOW WHILE YOU ARE SCROLLING DOWN</div>
+    <div class="page">
+      <div class="section"><span>STOP NOW WHILE YOU ARE SCROLLING DOWN</span></div>
+      <div class="section"><span>TURN BACK</span></div>
+      <div class="section"><span>THIS IS YOUR LAST WARNING</span></div>
+      <div class="section"><span>DON'T KEEP GOING</span></div>
+      <div class="section"><span>STOP NOW</span></div>
+      <div class="section"><span>WHY ARE YOU STILL SCROLLING</span></div>
+      <div class="bottom">
+        <img class="hell" src="/pluv/HELL.png" alt="pluv" />
+      </div>
+    </div>
+    <div class="fade" id="fade"></div>
     <script>
+      const hell = document.querySelector(".hell");
+      const fade = document.getElementById("fade");
+      let triggered = false;
+
       function checkBottom() {
         const scrollPosition = window.scrollY + window.innerHeight;
-        const threshold = document.documentElement.scrollHeight - 200;
-        if (scrollPosition >= threshold) {
-          window.location.href = "https://crowthecrow.com/";
+        const threshold = document.documentElement.scrollHeight - window.innerHeight * 1.2;
+        if (scrollPosition >= threshold && !triggered) {
+          triggered = true;
+          hell.classList.add("show");
+          setTimeout(() => {
+            hell.classList.add("intense");
+            fade.classList.add("on");
+          }, 4200);
+          setTimeout(() => {
+            window.location.href = "https://www.youtube.com/watch?v=eXiwYUCe_bY";
+          }, 10000);
         }
       }
 
