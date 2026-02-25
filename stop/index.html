@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pluv</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        color: #000;
+        height: 100%;
+      }
+      .page {
+        min-height: 600vh;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 80px;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        font-size: 24px;
+        letter-spacing: 0.08em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">STOP NOW WHILE YOU ARE SCROLLING DOWN</div>
+    <script>
+      function checkBottom() {
+        const scrollPosition = window.scrollY + window.innerHeight;
+        const threshold = document.documentElement.scrollHeight - 200;
+        if (scrollPosition >= threshold) {
+          window.location.href = "https://crowthecrow.com/";
+        }
+      }
+
+      window.addEventListener("scroll", checkBottom);
+      checkBottom();
+    </script>
+  </body>
+</html>

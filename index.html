@@ -125,6 +125,9 @@
       pluvEl.src = pluvImage;
       if (pluvImage.endsWith("inhiding.png")) {
         pluvEl.classList.add("shake");
+        setTimeout(() => {
+          window.location.href = "/stop/";
+        }, 30000);
       }
     </script>
   </body>
