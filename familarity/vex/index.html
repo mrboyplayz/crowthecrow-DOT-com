@@ -40,35 +40,26 @@
  <li><a class="cat hde" href="https://smlwiki.com/store">Store</a></li>
  <li><a class="cat hde" href="https://smlwiki.com/news/">News</a></li>
 </ul> </nav> </header>
-<script>document.querySelectorAll("nav a.cat").forEach(e=>{let t=e.getAttribute("href").replace(/\/+$/,"");t===location.pathname.replace(/\/+$/,"")&&(e.id="currentcat")});const Fb="brightness",Fs="saturate",Fh="hue-rotate",Fc="contrast",Fp="sepia",Fi="invert",_Ff={red:`${Fp}(1)${Fb}(1.14)${Fh}(-49deg)${Fc}(1.1)${Fs}(6)`,pink:`${Fp}(1)${Fb}(1.44)${Fc}(.8)${Fh}(-49deg)${Fc}(1.4)${Fs}(3)`,rose:`${Fp}(1)${Fb}(1.44)${Fc}(.8)${Fh}(-49deg)${Fc}(1.4)${Fs}(3)`,orange:`${Fb}(1.09)${Fp}(.97)${Fc}(.98)${Fs}(5)${Fh}(-20deg)`,fire:`${Fc}(1.1)${Fp}(1)${Fb}(1.34)${Fh}(-20deg)${Fs}(7)`,yellow:`${Fb}(1.1)${Fp}(.97)${Fs}(5)${Fh}(10deg)`,gold:`${Fc}(1.1)${Fp}(1)${Fb}(1.34)${Fs}(5)${Fh}(0deg)`,dank:`${Fb}(1.2)${Fp}(.97)${Fs}(5)${Fh}(40deg)`,green:`${Fb}(1.2)${Fp}(.97)${Fs}(5)${Fh}(80deg)`,neon_green:`${Fb}(1)${Fp}(.97)${Fs}(5)${Fh}(30deg)${Fb}(1.4)${Fc}(1.1)`,neon_blue:`${Fp}(1)${Fb}(1.2)${Fs}(5)${Fh}(128deg)`,blue:`${Fb}(1)${Fp}(.97)${Fs}(5)${Fh}(170deg)`,crystal_blue:`${Fb}(1.2)${Fp}(.9)${Fs}(5)${Fh}(198deg)`,purplewiki:`${Fc}(1.1)${Fp}(1)${Fb}(1)${Fs}(5)${Fh}(220deg)`,purple:`${Fc}(1.1)${Fp}(1)${Fb}(1)${Fs}(5)${Fh}(250deg)`,baja:`${Fp}(1)${Fb}(1.24)${Fc}(.8)${Fh}(89deg)${Fc}(1.2)${Fs}(2)`,white:`${Fb}(1.1)${Fp}(.97)${Fs}(0)${Fh}(10deg)`,gray:`${Fb}(1.1)${Fp}(.97)${Fs}(0)${Fh}(10deg)`,grey:`${Fb}(1.1)${Fp}(.97)${Fs}(0)${Fh}(10deg)`,inverted:`${Fh}(180deg)${Fb}(2.1)${Fi}(1)${Fc}(1.3)${Fc}(.9)`,gmajor:`${Fb}(2.1)${Fi}(1)${Fc}(1.3)${Fc}(.9)`,higher_contrast:`${Fh}(1deg)${Fb}(1.3)${Fc}(.3)${Fc}(3.3)`,irida:`${Fp}(.97)${Fb}(5)${Fi}(1)${Fs}(0)${Fc}(.91)${Fh}(10deg)`,none:"none",clear:"none",revert:"none",reset:"none",normal:"none"};document.addEventListener("DOMContentLoaded",()=>{const _Cf=localStorage.getItem("header_color");_Cf&&_Ff[_Cf]&&document.querySelector("header")&&(document.querySelector("header").style.filter=_Ff[_Cf])});</script>  <link rel="icon" type="image/x-icon" href="https://smlwiki.com/favicon.ico"> <meta charset="UTF-8"> <meta name="robots" content="noindex"> <title>CROW</title> <meta name="description" content="Hello Enter my Page I'm the big C">  
+<script>document.querySelectorAll("nav a.cat").forEach(e=>{let t=e.getAttribute("href").replace(/\/+$/,"");t===location.pathname.replace(/\/+$/,"")&&(e.id="currentcat")});const Fb="brightness",Fs="saturate",Fh="hue-rotate",Fc="contrast",Fp="sepia",Fi="invert",_Ff={red:`${Fp}(1)${Fb}(1.14)${Fh}(-49deg)${Fc}(1.1)${Fs}(6)`,pink:`${Fp}(1)${Fb}(1.44)${Fc}(.8)${Fh}(-49deg)${Fc}(1.4)${Fs}(3)`,rose:`${Fp}(1)${Fb}(1.44)${Fc}(.8)${Fh}(-49deg)${Fc}(1.4)${Fs}(3)`,orange:`${Fb}(1.09)${Fp}(.97)${Fc}(.98)${Fs}(5)${Fh}(-20deg)`,fire:`${Fc}(1.1)${Fp}(1)${Fb}(1.34)${Fh}(-20deg)${Fs}(7)`,yellow:`${Fb}(1.1)${Fp}(.97)${Fs}(5)${Fh}(10deg)`,gold:`${Fc}(1.1)${Fp}(1)${Fb}(1.34)${Fs}(5)${Fh}(0deg)`,dank:`${Fb}(1.2)${Fp}(.97)${Fs}(5)${Fh}(40deg)`,green:`${Fb}(1.2)${Fp}(.97)${Fs}(5)${Fh}(80deg)`,neon_green:`${Fb}(1)${Fp}(.97)${Fs}(5)${Fh}(30deg)${Fb}(1.4)${Fc}(1.1)`,neon_blue:`${Fp}(1)${Fb}(1.2)${Fs}(5)${Fh}(128deg)`,blue:`${Fb}(1)${Fp}(.97)${Fs}(5)${Fh}(170deg)`,crystal_blue:`${Fb}(1.2)${Fp}(.9)${Fs}(5)${Fh}(198deg)`,purplewiki:`${Fc}(1.1)${Fp}(1)${Fb}(1)${Fs}(5)${Fh}(220deg)`,purple:`${Fc}(1.1)${Fp}(1)${Fb}(1)${Fs}(5)${Fh}(250deg)`,baja:`${Fp}(1)${Fb}(1.24)${Fc}(.8)${Fh}(89deg)${Fc}(1.2)${Fs}(2)`,white:`${Fb}(1.1)${Fp}(.97)${Fs}(0)${Fh}(10deg)`,gray:`${Fb}(1.1)${Fp}(.97)${Fs}(0)${Fh}(10deg)`,grey:`${Fb}(1.1)${Fp}(.97)${Fs}(0)${Fh}(10deg)`,inverted:`${Fh}(180deg)${Fb}(2.1)${Fi}(1)${Fc}(1.3)${Fc}(.9)`,gmajor:`${Fb}(2.1)${Fi}(1)${Fc}(1.3)${Fc}(.9)`,higher_contrast:`${Fh}(1deg)${Fb}(1.3)${Fc}(.3)${Fc}(3.3)`,irida:`${Fp}(.97)${Fb}(5)${Fi}(1)${Fs}(0)${Fc}(.91)${Fh}(10deg)`,none:"none",clear:"none",revert:"none",reset:"none",normal:"none"};document.addEventListener("DOMContentLoaded",()=>{const _Cf=localStorage.getItem("header_color");_Cf&&_Ff[_Cf]&&document.querySelector("header")&&(document.querySelector("header").style.filter=_Ff[_Cf])});</script>  <link rel="icon" type="image/x-icon" href="https://smlwiki.com/favicon.ico"> <meta charset="UTF-8"> <meta name="robots" content="noindex"> <title>VEX</title> <meta name="description" content="atlyss">  
 <link rel="stylesheet" href="/smlwiki/characters.css"> 
 <style> .gallery { white-space: nowrap; width: 128px; height: 128px; display: inline-block; } .gallery img { margin-right: 23px; border: solid 1px; width: 208px; height: 168px; } .gallery img:nth-child(2):hover { filter: invert(1) } </style>
 
  <div id="cfix"></div>  
   <div id="container"><div id="text-content">
-    <h1>CROW</h1>
+    <h1>vex</h1>
         <div class="text-entry">
-                <h2>Big C</h2>
-                <p>CROW is a person who hosts the server
-                     <a href="https://discord.gg/cp5cS49Nk9">"CROW'S ZCity"</a> 
-                     The server got 800 members at it's peak.
-                     It has got a record of THREE nukes in its lifespan. 
-                     Still living.</p>
-            </div>
-        <div class="text-entry">
-                <h2>stupid ass inside jokes</h2>
-                <p><a href="https://medal.tv/games/garrys-mod/clips/ljZ2qZxxrHIcpKnu3?invite=cr-MSxnTGIsNDIwNDg4MDQ4">Joe with the guy named Joe?</a>
-                <a href="https://medal.tv/games/crab-game/clips/mbwgt8SahAYhx6gzL?invite=cr-MSxYVGUsNDIwNDg4MDQ4&v=9">CAKEWALK</a>
-            <a href="https://medal.tv/games/garrys-mod/clips/mao2lNvtXyu51SAcU?invite=cr-MSxCYm8sNDIwNDg4MDQ4&v=15">eric cartman getting turned into a bloody red pulp</a>
-            <a href="https://medal.tv/games/garrys-mod/clips/lM8MJPkMYWk4bvR54?invite=cr-MSxGV0gsNDIwNDg4MDQ4&v=23">jeffy actually found in gmod</a></p>
+                <h2>About vex</h2>
+                <p>vex caught playing ATL/%$#?#@ Vex is a admin at CROW'S ZCity. He is a gooner!!!!! But anyway, 
+                     Vex is a 14 year old who was born in russia, and currently lives in moscow.
+                    20+ bans for vex</p>
             </div>
         <div class="text-entry">
                 <h2>Gallery</h2>
-            <div class="gallery"><img src="/smlwiki/REALcrow.webp" title="Former image"><img src="/smlwiki/saudipluv.jpg" title="Current image"></div></div>
+            <div class="gallery"><img src="/pluv/pissedoffpluv.png" title="angry ass pluv"><img src="/smlwiki/vex.png" title="Vex"></div></div>
                         </div>
 <div id="image-frame"> <div class="textbox">Appearance:</div> <div class="appearance-buttons"> <button style="width:100%">Current</button> </div>
-<div id="image-container"> <img src="/smlwiki/saudipluv.jpg"> </div>
-<div class="infobox">this damn crow</div> </div> </div>
+<div id="image-container"> <img src="/smlwiki/vex.png"> </div>
+<div class="infobox">city BOIII city BOIIII</div> </div> </div>
  
 
 <script>localStorage.setItem("uid","crow");sessionStorage.setItem("firstvisitsession","false");</script>
