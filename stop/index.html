@@ -137,7 +137,40 @@
     <script>
       const hell = document.querySelector(".hell");
       const fade = document.getElementById("fade");
+      const sections = Array.from(document.querySelectorAll(".section span"));
+      const phrases = [
+        "STOP NOW WHILE YOU ARE SCROLLING DOWN",
+        "TURN BACK",
+        "THIS IS YOUR LAST WARNING",
+        "DON'T KEEP GOING",
+        "STOP NOW",
+        "WHY ARE YOU STILL SCROLLING",
+        "YOU WERE WARNED",
+        "LEAVE NOW",
+        "NO TURNING BACK",
+        "CLOSE THE TAB",
+        "KEEPING GOING IS A MISTAKE",
+        "STOP",
+        "RUN",
+        "GO BACK",
+        "ENOUGH"
+      ];
       let triggered = false;
+
+      if (sessionStorage.getItem("pluv-stop") !== "1") {
+        window.location.href = "https://crowthecrow.com/";
+      } else {
+        sessionStorage.removeItem("pluv-stop");
+      }
+
+      function randomizeText() {
+        sections.forEach((span) => {
+          span.textContent = phrases[Math.floor(Math.random() * phrases.length)];
+        });
+      }
+
+      randomizeText();
+      setInterval(randomizeText, 700);
 
       function checkBottom() {
         const scrollPosition = window.scrollY + window.innerHeight;
