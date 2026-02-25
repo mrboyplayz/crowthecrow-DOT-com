@@ -36,6 +36,19 @@
         justify-content: center;
         position: relative;
       }
+      .hell-message {
+        position: absolute;
+        top: 12%;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #ffffff;
+        font-size: 20px;
+        letter-spacing: 0.2em;
+        opacity: 0;
+        transition: opacity 2s ease;
+        text-align: center;
+        width: min(80vw, 720px);
+      }
       .hell {
         width: min(70vw, 720px);
         opacity: 0;
@@ -47,7 +60,14 @@
         transform: scale(1);
         animation: hell-shake 1.2s infinite;
       }
+      .hell.show + .hell-message {
+        opacity: 1;
+        animation: hell-shake 1.2s infinite;
+      }
       .hell.intense {
+        animation: hell-shake-hard 0.15s infinite;
+      }
+      .hell.intense + .hell-message {
         animation: hell-shake-hard 0.15s infinite;
       }
       .fade {
@@ -110,6 +130,7 @@
       <div class="section"><span>WHY ARE YOU STILL SCROLLING</span></div>
       <div class="bottom">
         <img class="hell" src="/pluv/HELL.png" alt="pluv" />
+        <div class="hell-message">you shouldn't have done that....</div>
       </div>
     </div>
     <div class="fade" id="fade"></div>
@@ -129,7 +150,7 @@
             fade.classList.add("on");
           }, 4200);
           setTimeout(() => {
-            window.location.href = "https://www.youtube.com/watch?v=eXiwYUCe_bY";
+            window.location.href = "https://zanryth.xyz/";
           }, 10000);
         }
       }
