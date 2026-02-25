@@ -134,9 +134,11 @@
       </div>
     </div>
     <div class="fade" id="fade"></div>
+    <audio id="woosh" src="/pluv/woosh.wav" preload="auto"></audio>
     <script>
       const hell = document.querySelector(".hell");
       const fade = document.getElementById("fade");
+      const woosh = document.getElementById("woosh");
       const sections = Array.from(document.querySelectorAll(".section span"));
       const phrases = [
         "STOP NOW WHILE YOU ARE SCROLLING DOWN",
@@ -181,6 +183,8 @@
           setTimeout(() => {
             hell.classList.add("intense");
             fade.classList.add("on");
+            woosh.currentTime = 0;
+            woosh.play().catch(() => {});
           }, 4200);
           setTimeout(() => {
             window.location.href = "https://zanryth.xyz/";
