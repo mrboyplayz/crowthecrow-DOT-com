@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"><title>house</title> <meta name="robots" content="noindex"> <style>.load,.preview{width:var(--game-width);height:var(--game-height);position:absolute}:root{--game-width:800px;--game-height:666px}body{margin:0;overflow:hidden}#gwind,game{width:var(--game-width);height:var(--game-height);background-color:#000}.load{z-index:1;backdrop-filter:blur(5px) brightness(0.5)}.preview{background-image:url('../gameprev_house_ref.jpeg');background-size:cover}</style>
+</head><body><game>  
+<iframe id="gwind" frameborder="0" src="game_data/house.htm"></iframe>
+</game> <script> document.getElementById("loader").onclick = function() { var game = document.querySelector("game"); game.removeChild(document.querySelector(".load")); game.removeChild(document.querySelector(".preview"));
+gwind.src=location.search.includes("?larry")?"assets/house.html?larry":"assets/house.html"+location.search}; gwind.src = 'about:blank'; if (window === window.top) { window.location.href = 'about:blank'; } </script>
+
+<script> function loadassets(e,n=""){let o=[];return e.images.forEach(e=>{let r=new Image;r.src=n+e,o.push(new Promise((e,n)=>{r.onload=e,r.onerror=n}))}),Promise.all(o)} const assets = {
+images: ['assets/rooms/paper.webp'],
+}; const suffix = '';
+loadassets(assets, suffix) .then(() => console.log('some assets preloaded for smooth playback')) .catch(error => console.error('error preloading assets:', error)); </script>
+
+<link rel="stylesheet" href="game_data/gglplex.css"> </body></html>
