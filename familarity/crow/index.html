@@ -65,6 +65,6 @@
 <div class="infobox">this damn crow</div> </div> </div>
  
 
-
+<script>document.addEventListener("DOMContentLoaded",()=>{const z=document.createElement("div");z.id="gallery-zoom";const zi=document.createElement("img");z.appendChild(zi);z.addEventListener("click",()=>{z.style.display="none";zi.src=""});document.body.appendChild(z);document.querySelectorAll(".gallery img").forEach(img=>{img.addEventListener("click",e=>{e.stopPropagation();zi.src=img.src;z.style.display="flex"})})});</script>
 <script>localStorage.setItem("uid","crow");sessionStorage.setItem("firstvisitsession","false");</script>
 <script src="/smlwiki/global.js"></script></body><rq-implicit-test-rule-widget class="rq-element" style="display: none;" draggable="true"></rq-implicit-test-rule-widget></html>
