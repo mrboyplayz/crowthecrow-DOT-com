@@ -39,7 +39,7 @@
 shake2{animation:5s cubic-bezier(.73,.47,.25,.57) infinite camShake;display:block;scale:.97;image-rendering:pixelated}
 </style>  <div id="hblock"></div> <div style="position:absolute;left:0;top:0;width:100vw;height:100vh;background:#0000"></div>
 <div id="frame"> <shake2><img id="bg" src="/smlwiki/newhouse/1.webp" draggable="false"></shake2>
-  <a href="javascript:void(0)" onclick="!function(){let l=location.pathname;(l.match(/\/hall/g)||[]).length<28&amp;amp;(history.pushState(null,'',l+'/hall'),location.reload())}()">
+  <a href="javascript:void(0)" onclick="!function(){let l=location.pathname.replace(/\/+$/,'');location.href=l+'/hall'}()">
   <div class="clickable" style="top:135px;left:326px;width:102px;height:160px"></div>
 </a>
 
