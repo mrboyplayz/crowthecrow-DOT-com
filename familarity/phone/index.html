@@ -52,7 +52,7 @@
     <div class="btn pntr" style="left:394px;top:410px" id="12"><img src="/smlwiki/phone/phone_12.png" draggable="false"></div>
 </div>
 </div>  
-<script>function beep(){}</script>
+<script>function beep(e){let t=new Audio(`/smlwiki/phone/${e}.ogg`);function n(){t.pause(),document.removeEventListener("mouseup",n),document.removeEventListener("mouseout",n)}t.play(),document.addEventListener("mouseup",n),document.addEventListener("mouseout",n)}</script>
 <script>function pickup(){phone.style.backgroundImage="url('/smlwiki/phone/phone_13.webp')";phone.style.pointerEvents="none";hnds.style.display="none";up.play()}
 function downnormal(){down.play(),phone.style.animation="recieverdown 128ms steps(3)";phone.style.backgroundImage="url('/smlwiki/phone/phone_00.webp')";phone.style.pointerEvents="auto";hnds.style.display="block"}
 let i_="";for(let i=1;i<=12;i++){let c=i.toString().padStart(2,"0"),btn=document.getElementById(c);btn&&(btn.addEventListener("mousedown",()=>{beep(c),i_+=c}),btn.addEventListener("touchstart",()=>{beep(c),i_+=c}))}handset.addEventListener("click",()=>{let s=i_;i_="";if(s.endsWith("0607")){pickup();const call=new Audio("/smlwiki/phone/AYe%20SIX%20SAYVEN.opus");call.play();call.addEventListener("ended",()=>{downnormal()});return}if(s.endsWith("010203")){pickup();const call=new Audio("/smlwiki/phone/jeffy.mp3");call.play();call.addEventListener("ended",()=>{downnormal()});return}if(s.endsWith("070707")){pickup();const call=new Audio("/smlwiki/phone/BINGUS.wav");call.play();call.addEventListener("ended",()=>{downnormal()});return}pickup();const alone=document.getElementById("alone");setTimeout(()=>{if(alone){alone.style.display="block"}},150);setTimeout(()=>{if(alone){alone.style.display="none"}downnormal()},1650)});
