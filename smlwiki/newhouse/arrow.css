@@ -1,0 +1,1 @@
+#arrow{z-index:5;position:absolute;left:50%;transform:translateX(-50%);opacity:.4;transition:opacity 128ms;cursor:url('/cursorclick.gif'),pointer;}#arrow:hover{opacity:.8}
