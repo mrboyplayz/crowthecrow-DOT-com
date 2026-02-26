@@ -15,3 +15,5 @@ body{background:url('/bin.l/smlwikibg.png') center local; scrollbar-color:#a00 #
 #gallery-zoom{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000c;z-index:9999}
 #gallery-zoom img{max-width:90vw;max-height:90vh;box-shadow:0 0 24px #000}
 .gallery img{cursor:zoom-in}
+#video-zoom{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000c;z-index:10000}
+#video-zoom iframe{width:min(90vw,960px);height:min(90vh,540px);border:0;box-shadow:0 0 24px #000}
