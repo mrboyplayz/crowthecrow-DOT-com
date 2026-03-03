@@ -351,7 +351,10 @@ function spinReels(){
       strip.style.transform="translateY(0)";
     },durations[i]+40);
   });
+  const endDelay=Math.max(...durations)+80;
   setTimeout(()=>{
+    rollingAudio.pause();
+    rollingAudio.currentTime=0;
     if(results[0]===results[1]&&results[1]===results[2]){
       const earned=getPoints(results[0]);
       score+=earned;
@@ -365,7 +368,7 @@ function spinReels(){
     }
     spinning=false;
     lever.disabled=false;
-  },Math.max(...durations)+80);
+  },endDelay);
 }
 playerNameInput.value=localStorage.getItem("slots_name")||"player";
 playerNameInput.addEventListener("input",()=>{
@@ -377,4 +380,4 @@ renderLeaderboard();
 lever.addEventListener("click",spinReels);
 setTimeout(()=>{document.getElementById("curtain").classList.add("open")},2000);
 </script>
-<script src="/smlwiki/global.js"></script></body></html>
+</body></html>
