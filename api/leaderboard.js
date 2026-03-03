@@ -13,6 +13,18 @@ export default async function handler(req, res) {
     return;
   }
   const key = "slots_leaderboard";
+  function normalizeList(result) {
+    if (Array.isArray(result)) return result;
+    if (typeof result === "string") {
+      try {
+        const parsed = JSON.parse(result);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
+    }
+    return [];
+  }
   try {
     if (req.method === "GET") {
       const resp = await fetch(`${url}/get/${key}`, {
@@ -20,7 +32,7 @@ export default async function handler(req, res) {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await resp.json();
-      const list = Array.isArray(data.result) ? data.result : [];
+      const list = normalizeList(data.result);
       res.status(200).json({ leaderboard: list.slice(0, 25) });
       return;
     }
@@ -33,7 +45,7 @@ export default async function handler(req, res) {
         headers: { Authorization: `Bearer ${token}` }
       });
       const getData = await getResp.json();
-      const list = Array.isArray(getData.result) ? getData.result : [];
+      const list = normalizeList(getData.result);
       const existing = list.find((entry) => entry.name === name);
       if (existing) {
         if (score > existing.score) existing.score = score;
