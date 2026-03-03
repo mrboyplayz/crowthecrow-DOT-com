@@ -42,11 +42,13 @@ body{margin:0;background:#000;color:#f33;font-family:'I KNOW A GHOST',Consolas,m
 #curtain.open #curtain-left{transform:translateX(-100%)}
 #curtain.open #curtain-right{transform:translateX(100%)}
 #slot-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;padding:140px 16px 60px}
-#machine{display:flex;gap:16px;align-items:center;justify-content:center;background:linear-gradient(#200,#050505);border:2px solid #500;box-shadow:0 0 20px #000 inset;padding:18px 20px;border-radius:6px}
-.reel{padding:10px;background:#000;border:1px solid #222;border-radius:4px}
-.reel-window{width:140px;height:110px;overflow:hidden;background:#080808;border:1px solid #111;box-shadow:inset 0 0 8px #000}
+#machine{position:relative;width:min(520px,90vw)}
+#machine .machine-base{width:100%;height:auto;display:block}
+#machine .reel-overlay{position:absolute;left:22%;top:34%;width:56%;height:26%;display:flex;gap:6%;align-items:center;justify-content:space-between;pointer-events:none}
+#machine .reel-slot{flex:1;height:100%;display:flex;align-items:center;justify-content:center}
+.reel-window{width:100%;height:100%;overflow:hidden;background:#080808;border:1px solid #111;box-shadow:inset 0 0 8px #000}
 .reel-strip{display:flex;flex-direction:column;gap:10px;transform:translateY(0)}
-.reel-strip img{width:140px;height:110px;object-fit:contain;display:block}
+.reel-strip img{width:100%;height:100%;object-fit:contain;display:block}
 #controls{display:flex;align-items:center;gap:14px}
 #leaderboard-toggle{background:#200;color:#f33;border:1px solid #600;padding:6px 12px;cursor:pointer;font-family:inherit;font-size:12px}
 #lever{background:#200;color:#f33;border:1px solid #600;padding:8px 16px;cursor:pointer;font-family:inherit;font-size:14px}
@@ -70,14 +72,17 @@ body{margin:0;background:#000;color:#f33;font-family:'I KNOW A GHOST',Consolas,m
 </div>
 <div id="slot-wrap">
   <div id="machine" aria-label="Slot machine">
-    <div class="reel">
-      <div class="reel-window"><div class="reel-strip" data-reel="1"></div></div>
-    </div>
-    <div class="reel">
-      <div class="reel-window"><div class="reel-strip" data-reel="2"></div></div>
-    </div>
-    <div class="reel">
-      <div class="reel-window"><div class="reel-strip" data-reel="3"></div></div>
+    <img id="machine-base" class="machine-base" src="/smlwiki/regular%20slots.png" alt="">
+    <div class="reel-overlay">
+      <div class="reel-slot">
+        <div class="reel-window"><div class="reel-strip" data-reel="1"></div></div>
+      </div>
+      <div class="reel-slot">
+        <div class="reel-window"><div class="reel-strip" data-reel="2"></div></div>
+      </div>
+      <div class="reel-slot">
+        <div class="reel-window"><div class="reel-strip" data-reel="3"></div></div>
+      </div>
     </div>
   </div>
   <div id="controls">
@@ -282,6 +287,8 @@ const leaderboardList=document.getElementById("leaderboard-list");
 const playerNameInput=document.getElementById("player-name");
 const leaderboardToggle=document.getElementById("leaderboard-toggle");
 const leaderboardPanel=document.getElementById("leaderboard");
+const machineBase=document.getElementById("machine-base");
+const machineImages={rest:"/smlwiki/regular%20slots.png",pull:"/smlwiki/pull%20lever%20down%20slots.png"};
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const leaderboardUrl=apiBase?`${apiBase}/api/leaderboard`:"/api/leaderboard";
 let score=0;
@@ -371,12 +378,15 @@ function spinReels(){
   spinning=true;
   lever.disabled=true;
   setStatus("spinning...");
+  if(machineBase)machineBase.src=machineImages.pull;
   rollingAudio.currentTime=0;
   rollingAudio.play().catch(()=>{});
   const results=reelStrips.map(()=>pickWeighted());
   const durations=[1200,1400,1600];
-  const itemHeight=110;
-  const itemGap=10;
+  const sampleStrip=reelStrips[0];
+  const reelWindow=sampleStrip?sampleStrip.closest(".reel-window"):null;
+  const itemHeight=reelWindow?reelWindow.clientHeight:110;
+  const itemGap=parseFloat(getComputedStyle(sampleStrip).gap)||10;
   reelStrips.forEach((strip,i)=>{
     const sequence=buildSequence(results[i],i*3);
     setStripContent(strip,sequence);
@@ -396,6 +406,7 @@ function spinReels(){
   setTimeout(()=>{
     rollingAudio.pause();
     rollingAudio.currentTime=0;
+    if(machineBase)machineBase.src=machineImages.rest;
     if(results[0]===results[1]&&results[1]===results[2]){
       const earned=getPoints(results[0]);
       score+=earned;
