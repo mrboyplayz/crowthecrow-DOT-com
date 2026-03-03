@@ -48,6 +48,7 @@ body{margin:0;background:#000;color:#f33;font-family:'I KNOW A GHOST',Consolas,m
 .reel-strip{display:flex;flex-direction:column;gap:10px;transform:translateY(0)}
 .reel-strip img{width:140px;height:110px;object-fit:contain;display:block}
 #controls{display:flex;align-items:center;gap:14px}
+#leaderboard-toggle{background:#200;color:#f33;border:1px solid #600;padding:6px 12px;cursor:pointer;font-family:inherit;font-size:12px}
 #lever{background:#200;color:#f33;border:1px solid #600;padding:8px 16px;cursor:pointer;font-family:inherit;font-size:14px}
 #scoreboard{font-size:14px}
 #status{font-size:12px;color:#f77;min-height:18px}
@@ -76,9 +77,10 @@ body{margin:0;background:#000;color:#f33;font-family:'I KNOW A GHOST',Consolas,m
   <div id="controls">
     <button id="lever">Pull Lever</button>
     <div id="scoreboard">Score: <span id="score">0</span></div>
+    <button id="leaderboard-toggle">Show Leaderboard</button>
   </div>
   <div id="status"></div>
-  <div id="leaderboard">
+  <div id="leaderboard" hidden>
     <h2>Leaderboard</h2>
     <div>name: <input id="player-name" maxlength="18" autocomplete="off"></div>
     <ol id="leaderboard-list"></ol>
@@ -272,6 +274,8 @@ const rollingAudio=document.getElementById("rolling-audio");
 const hitAudio=document.getElementById("hit-audio");
 const leaderboardList=document.getElementById("leaderboard-list");
 const playerNameInput=document.getElementById("player-name");
+const leaderboardToggle=document.getElementById("leaderboard-toggle");
+const leaderboardPanel=document.getElementById("leaderboard");
 let score=0;
 let spinning=false;
 function getWeight(src){return weights[src]??1}
@@ -378,6 +382,11 @@ playerNameInput.addEventListener("input",()=>{
 });
 reelStrips.forEach(strip=>setStripContent(strip,["/pluv/pluv.png"]));
 renderLeaderboard();
+leaderboardToggle.addEventListener("click",()=>{
+  const isHidden=leaderboardPanel.hasAttribute("hidden");
+  leaderboardPanel.toggleAttribute("hidden",!isHidden);
+  leaderboardToggle.textContent=isHidden?"Hide Leaderboard":"Show Leaderboard";
+});
 lever.addEventListener("click",spinReels);
 setTimeout(()=>{document.getElementById("curtain").classList.add("open")},2000);
 </script>
