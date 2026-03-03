@@ -95,6 +95,7 @@ body{margin:0;background:#000;color:#f33;font-family:'I KNOW A GHOST',Consolas,m
 <audio id="rolling-audio" src="/smlwiki/rolling.mp3" preload="auto"></audio>
 <audio id="hit-audio" src="/smlwiki/hit.mp3" preload="auto"></audio>
 <script>
+(()=>{
 const pluvImages=[
   "/pluv/CALLOFPLUV2.png",
   "/pluv/HELL.png",
@@ -425,6 +426,7 @@ leaderboardToggle.addEventListener("click",()=>{
 });
 lever.addEventListener("click",spinReels);
 setTimeout(()=>{document.getElementById("curtain").classList.add("open")},2000);
+})();
 </script>
 <script src="/smlwiki/global.js"></script>
 </body></html>

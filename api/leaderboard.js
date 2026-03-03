@@ -40,6 +40,11 @@ export default async function handler(req, res) {
       const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
       const name = String(body?.name || "").trim().slice(0, 18) || "player";
       const score = Number(body?.score || 0);
+      if (!Number.isFinite(score) || score < 0) {
+        res.status(400).json({ error: "now wait a fucking second you STUPID FUCKING CHEATER DIE" });
+        return;
+      }
+      const normalizedScore = Math.floor(score);
       const getResp = await fetch(`${url}/get/${key}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
@@ -47,10 +52,20 @@ export default async function handler(req, res) {
       const getData = await getResp.json();
       const list = normalizeList(getData.result);
       const existing = list.find((entry) => entry.name === name);
+      const maxDelta = 50;
       if (existing) {
-        if (score > existing.score) existing.score = score;
+        const previousScore = Number(existing.score || 0);
+        if (normalizedScore > previousScore + maxDelta) {
+          res.status(400).json({ error: "score_jump" });
+          return;
+        }
+        if (normalizedScore > previousScore) existing.score = normalizedScore;
       } else {
-        list.push({ name, score });
+        if (normalizedScore > maxDelta) {
+          res.status(400).json({ error: "score_jump" });
+          return;
+        }
+        list.push({ name, score: normalizedScore });
       }
       list.sort((a, b) => b.score - a.score);
       const setResp = await fetch(`${url}/set/${key}`, {
