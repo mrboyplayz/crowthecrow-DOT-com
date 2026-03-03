@@ -42,8 +42,10 @@ body{margin:0;background:#000;color:#f33;font-family:Consolas,monospace;min-heig
 #curtain.open #curtain-right{transform:translateX(100%)}
 #slot-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;padding:140px 16px 60px}
 #machine{display:flex;gap:16px;align-items:center;justify-content:center;background:linear-gradient(#200,#050505);border:2px solid #500;box-shadow:0 0 20px #000 inset;padding:18px 20px;border-radius:6px}
-.reel{display:flex;flex-direction:column;gap:10px;padding:10px;background:#000;border:1px solid #222;border-radius:4px}
-.reel img{width:140px;height:110px;object-fit:contain;background:#080808;border:1px solid #111;box-shadow:inset 0 0 8px #000}
+.reel{padding:10px;background:#000;border:1px solid #222;border-radius:4px}
+.reel-window{width:140px;height:110px;overflow:hidden;background:#080808;border:1px solid #111;box-shadow:inset 0 0 8px #000}
+.reel-strip{display:flex;flex-direction:column;gap:10px;transform:translateY(0)}
+.reel-strip img{width:140px;height:110px;object-fit:contain;display:block}
 #controls{display:flex;align-items:center;gap:14px}
 #lever{background:#200;color:#f33;border:1px solid #600;padding:8px 16px;cursor:pointer;font-family:inherit;font-size:14px}
 #scoreboard{font-size:14px}
@@ -61,16 +63,13 @@ body{margin:0;background:#000;color:#f33;font-family:Consolas,monospace;min-heig
 <div id="slot-wrap">
   <div id="machine" aria-label="Slot machine">
     <div class="reel">
-      <img id="reel1-top" src="/pluv/pluv.png">
-      <img id="reel1-bottom" src="/pluv/inhiding.png">
+      <div class="reel-window"><div class="reel-strip" data-reel="1"></div></div>
     </div>
     <div class="reel">
-      <img id="reel2-top" src="/pluv/pluv.png">
-      <img id="reel2-bottom" src="/pluv/inhiding.png">
+      <div class="reel-window"><div class="reel-strip" data-reel="2"></div></div>
     </div>
     <div class="reel">
-      <img id="reel3-top" src="/pluv/pluv.png">
-      <img id="reel3-bottom" src="/pluv/inhiding.png">
+      <div class="reel-window"><div class="reel-strip" data-reel="3"></div></div>
     </div>
   </div>
   <div id="controls">
@@ -264,8 +263,7 @@ const points={
   "/pluv/zeepluv.png":4,
   "/pluv/zombpluv.png":10
 };
-const topImgs=[document.getElementById("reel1-top"),document.getElementById("reel2-top"),document.getElementById("reel3-top")];
-const bottomImgs=[document.getElementById("reel1-bottom"),document.getElementById("reel2-bottom"),document.getElementById("reel3-bottom")];
+const reelStrips=Array.from(document.querySelectorAll(".reel-strip"));
 const lever=document.getElementById("lever");
 const scoreEl=document.getElementById("score");
 const statusEl=document.getElementById("status");
@@ -318,6 +316,15 @@ function updateLeaderboard(newScore){
   saveLeaderboard(list);
   renderLeaderboard();
 }
+function buildSequence(resultSrc, offset){
+  const start=(Math.floor(Math.random()*pluvImages.length)+offset)%pluvImages.length;
+  const rotated=pluvImages.slice(start).concat(pluvImages.slice(0,start));
+  const extra=rotated.slice(0,Math.min(12,rotated.length));
+  return rotated.concat(extra,[resultSrc]);
+}
+function setStripContent(strip, sequence){
+  strip.innerHTML=sequence.map(src=>`<img src="${src}">`).join("");
+}
 function spinReels(){
   if(spinning)return;
   spinning=true;
@@ -325,18 +332,26 @@ function spinReels(){
   setStatus("spinning...");
   rollingAudio.currentTime=0;
   rollingAudio.play().catch(()=>{});
-  let idx=Math.floor(Math.random()*pluvImages.length);
-  const offsets=[0,11,23];
-  const interval=setInterval(()=>{
-    idx=(idx+1)%pluvImages.length;
-    topImgs.forEach((img,i)=>{img.src=pluvImages[(idx+offsets[i])%pluvImages.length]});
-    bottomImgs.forEach((img,i)=>{img.src=pluvImages[(idx+offsets[i]+3)%pluvImages.length]});
-  },70);
+  const results=reelStrips.map(()=>pickWeighted());
+  const durations=[1200,1400,1600];
+  const itemHeight=110;
+  const itemGap=10;
+  reelStrips.forEach((strip,i)=>{
+    const sequence=buildSequence(results[i],i*3);
+    setStripContent(strip,sequence);
+    strip.style.transition="none";
+    strip.style.transform="translateY(0)";
+    strip.offsetHeight;
+    strip.style.transition=`transform ${durations[i]}ms cubic-bezier(.1,.6,.15,1)`;
+    const distance=(sequence.length-1)*(itemHeight+itemGap);
+    strip.style.transform=`translateY(-${distance}px)`;
+    setTimeout(()=>{
+      strip.style.transition="none";
+      setStripContent(strip,[results[i]]);
+      strip.style.transform="translateY(0)";
+    },durations[i]+40);
+  });
   setTimeout(()=>{
-    clearInterval(interval);
-    const results=topImgs.map(()=>pickWeighted());
-    results.forEach((src,i)=>{topImgs[i].src=src});
-    bottomImgs.forEach((img,i)=>{img.src=pluvImages[(pluvImages.indexOf(results[i])+5)%pluvImages.length]});
     if(results[0]===results[1]&&results[1]===results[2]){
       const earned=getPoints(results[0]);
       score+=earned;
@@ -350,13 +365,14 @@ function spinReels(){
     }
     spinning=false;
     lever.disabled=false;
-  },1900);
+  },Math.max(...durations)+80);
 }
 playerNameInput.value=localStorage.getItem("slots_name")||"player";
 playerNameInput.addEventListener("input",()=>{
   localStorage.setItem("slots_name",playerNameInput.value.trim()||"player");
   renderLeaderboard();
 });
+reelStrips.forEach(strip=>setStripContent(strip,["/pluv/pluv.png"]));
 renderLeaderboard();
 lever.addEventListener("click",spinReels);
 setTimeout(()=>{document.getElementById("curtain").classList.add("open")},2000);
