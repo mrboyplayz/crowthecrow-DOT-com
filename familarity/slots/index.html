@@ -52,11 +52,17 @@ body{margin:0;background:#000;color:#f33;font-family:'I KNOW A GHOST',Consolas,m
 #lever{background:#200;color:#f33;border:1px solid #600;padding:8px 16px;cursor:pointer;font-family:inherit;font-size:14px}
 #scoreboard{font-size:14px}
 #status{font-size:12px;color:#f77;min-height:18px}
-#leaderboard{margin-top:8px;border:1px solid #222;background:#040404;padding:10px 12px;min-width:260px}
-#leaderboard h2{margin:0 0 8px;font-size:14px;color:#f55}
-#leaderboard input{background:#000;border:1px solid #222;color:#f33;padding:4px 6px;font-family:inherit;font-size:12px;width:140px}
-#leaderboard ol{margin:8px 0 0 16px;padding:0;font-size:12px;color:#f88}
-#leaderboard li{margin:2px 0}
+#leaderboard{margin-top:8px;border:1px solid #600;background:linear-gradient(180deg,#1a0000,#040404 80%);padding:14px 16px;min-width:320px;box-shadow:0 0 16px #000 inset,0 10px 24px #000}
+#leaderboard h2{margin:0 0 10px;font-size:16px;color:#ff6;letter-spacing:1px}
+#leaderboard .leaderboard-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px}
+#leaderboard input{background:#0a0000;border:1px solid #400;color:#f66;padding:6px 8px;font-family:inherit;font-size:12px;width:160px;border-radius:4px}
+#leaderboard ol{margin:0;padding:0;list-style:none;font-size:12px}
+#leaderboard li{display:flex;align-items:center;gap:8px;padding:6px 8px;margin:4px 0;border:1px solid #2a0000;border-radius:4px;background:#120000}
+#leaderboard li:nth-child(even){background:#0b0000}
+#leaderboard .rank{width:34px;color:#ff6;text-align:center}
+#leaderboard .name{flex:1;color:#f88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#leaderboard .score{width:70px;color:#ffd;text-align:right}
+#leaderboard .leaderboard-empty{justify-content:center;color:#c66}
 </style>
 <div id="curtain">
   <img id="curtain-left" src="/smlwiki/curtain1.png">
@@ -82,7 +88,7 @@ body{margin:0;background:#000;color:#f33;font-family:'I KNOW A GHOST',Consolas,m
   <div id="status"></div>
   <div id="leaderboard" hidden>
     <h2>Leaderboard</h2>
-    <div>name: <input id="player-name" maxlength="18" autocomplete="off"></div>
+    <div class="leaderboard-row">name <input id="player-name" maxlength="18" autocomplete="off"></div>
     <ol id="leaderboard-list"></ol>
   </div>
 </div>
@@ -276,6 +282,8 @@ const leaderboardList=document.getElementById("leaderboard-list");
 const playerNameInput=document.getElementById("player-name");
 const leaderboardToggle=document.getElementById("leaderboard-toggle");
 const leaderboardPanel=document.getElementById("leaderboard");
+const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
+const leaderboardUrl=apiBase?`${apiBase}/api/leaderboard`:"/api/leaderboard";
 let score=0;
 let spinning=false;
 function getWeight(src){return weights[src]??1}
@@ -291,35 +299,63 @@ function pickWeighted(){
   return pluvImages[pluvImages.length-1];
 }
 function setStatus(text){statusEl.textContent=text}
-function loadLeaderboard(){
-  const raw=localStorage.getItem("slots_leaderboard");
-  const list=raw?JSON.parse(raw):[];
-  return Array.isArray(list)?list:[];
+async function fetchLeaderboard(){
+  try{
+    const resp=await fetch(leaderboardUrl);
+    if(!resp.ok)return [];
+    const data=await resp.json();
+    return Array.isArray(data.leaderboard)?data.leaderboard:[];
+  }catch(_){
+    return [];
+  }
 }
-function saveLeaderboard(list){
-  localStorage.setItem("slots_leaderboard",JSON.stringify(list));
-}
-function renderLeaderboard(){
-  const list=loadLeaderboard().slice(0,8);
+function renderLeaderboard(list){
   leaderboardList.innerHTML="";
-  list.forEach(entry=>{
+  if(!list.length){
     const li=document.createElement("li");
-    li.textContent=`${entry.name}: ${entry.score}`;
+    li.className="leaderboard-empty";
+    li.textContent="no scores yet";
+    leaderboardList.appendChild(li);
+    return;
+  }
+  list.slice(0,8).forEach((entry,index)=>{
+    const li=document.createElement("li");
+    const rank=document.createElement("span");
+    rank.className="rank";
+    rank.textContent=`#${index+1}`;
+    const name=document.createElement("span");
+    name.className="name";
+    name.textContent=entry.name;
+    const scoreSpan=document.createElement("span");
+    scoreSpan.className="score";
+    scoreSpan.textContent=entry.score;
+    li.appendChild(rank);
+    li.appendChild(name);
+    li.appendChild(scoreSpan);
     leaderboardList.appendChild(li);
   });
 }
-function updateLeaderboard(newScore){
+async function updateLeaderboard(newScore){
   const name=playerNameInput.value.trim()||"player";
-  const list=loadLeaderboard();
-  const existing=list.find(entry=>entry.name===name);
-  if(existing){
-    if(newScore>existing.score)existing.score=newScore;
-  }else{
-    list.push({name,score:newScore});
+  try{
+    const resp=await fetch(leaderboardUrl,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name,score:newScore})
+    });
+    if(!resp.ok){
+      setStatus("leaderboard offline");
+      return;
+    }
+    const data=await resp.json();
+    renderLeaderboard(Array.isArray(data.leaderboard)?data.leaderboard:[]);
+  }catch(_){
+    setStatus("leaderboard offline");
   }
-  list.sort((a,b)=>b.score-a.score);
-  saveLeaderboard(list);
-  renderLeaderboard();
+}
+async function refreshLeaderboard(){
+  const list=await fetchLeaderboard();
+  renderLeaderboard(list);
 }
 function buildSequence(resultSrc, offset){
   const start=(Math.floor(Math.random()*pluvImages.length)+offset)%pluvImages.length;
@@ -378,14 +414,14 @@ function spinReels(){
 playerNameInput.value=localStorage.getItem("slots_name")||"player";
 playerNameInput.addEventListener("input",()=>{
   localStorage.setItem("slots_name",playerNameInput.value.trim()||"player");
-  renderLeaderboard();
 });
 reelStrips.forEach(strip=>setStripContent(strip,["/pluv/pluv.png"]));
-renderLeaderboard();
+refreshLeaderboard();
 leaderboardToggle.addEventListener("click",()=>{
   const isHidden=leaderboardPanel.hasAttribute("hidden");
   leaderboardPanel.toggleAttribute("hidden",!isHidden);
   leaderboardToggle.textContent=isHidden?"Hide Leaderboard":"Show Leaderboard";
+  if(isHidden)refreshLeaderboard();
 });
 lever.addEventListener("click",spinReels);
 setTimeout(()=>{document.getElementById("curtain").classList.add("open")},2000);
