@@ -92,16 +92,18 @@ body{margin:0;background:#000;color:#f33;font-family:'I KNOW A GHOST',Consolas,m
       </div>
     </div>
   </div>
-  <div id="controls">
-    <button id="lever">Pull Lever</button>
-    <div id="scoreboard">Score: <span id="score">0</span></div>
-    <button id="leaderboard-toggle">Show Leaderboard</button>
-  </div>
-  <div id="status"></div>
-  <div id="leaderboard" hidden>
-    <h2>Leaderboard</h2>
-    <div class="leaderboard-row">name <input id="player-name" maxlength="18" autocomplete="off"></div>
-    <ol id="leaderboard-list"></ol>
+  <div id="side-panel">
+    <div id="controls">
+      <button id="lever">Pull Lever</button>
+      <div id="scoreboard">Score: <span id="score">0</span></div>
+      <button id="leaderboard-toggle">Show Leaderboard</button>
+    </div>
+    <div id="status"></div>
+    <div id="leaderboard" hidden>
+      <h2>Leaderboard</h2>
+      <div class="leaderboard-row">name <input id="player-name" maxlength="18" autocomplete="off"></div>
+      <ol id="leaderboard-list"></ol>
+    </div>
   </div>
 </div>
 <audio id="rolling-audio" src="/smlwiki/rolling.mp3" preload="auto"></audio>
