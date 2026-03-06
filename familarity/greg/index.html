@@ -1,43 +1,64 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="robots" content="noindex">
-<title>greg</title>
-<style>
-html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}
-#cookie{width:100vw;height:100vh;object-fit:contain;display:block;transform-origin:center center;will-change:transform}
-.dance{animation:dance 0.8s ease-in-out infinite}
-@keyframes dance{
-  0%{transform:translateY(0) scale(1) rotate(0deg)}
-  10%{transform:translateY(18px) scale(1.12,0.86) rotate(-22deg)}
-  22%{transform:translateY(-40px) scale(0.94,1.18) rotate(24deg)}
-  34%{transform:translateY(12px) scale(1.1,0.88) rotate(-20deg)}
-  46%{transform:translateY(-32px) scale(0.92,1.22) rotate(26deg)}
-  58%{transform:translateY(20px) scale(1.14,0.84) rotate(-24deg)}
-  70%{transform:translateY(-26px) scale(0.96,1.16) rotate(22deg)}
-  82%{transform:translateY(10px) scale(1.08,0.9) rotate(-18deg)}
-  100%{transform:translateY(0) scale(1) rotate(0deg)}
-}
-</style>
-</head>
-<body>
-<img id="cookie" src="/smlwiki/cookie.png" alt="cookie">
-<script>
-const cookie=document.getElementById("cookie");
-const audio=new Audio("/smlwiki/dance.mp3");
-const originalSrc=cookie.getAttribute("src");
-cookie.src="/smlwiki/mannytko.png";
-setTimeout(()=>{cookie.src=originalSrc},200);
-audio.play().catch(()=>{});
-setTimeout(()=>{cookie.classList.add("dance")},6000);
-const target="https://www.youtube.com/watch?v=iTpc03s4U_E";
-function finish(){
-  window.location.href=target;
-  setTimeout(()=>{window.close()},200);
-}
-audio.addEventListener("ended",finish);
-setTimeout(finish,30000);
-</script>
-</body>
-</html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta charset="UTF-8"><link rel="stylesheet" href="/smlwiki/header.css"></head>
+<body><header><a href="https://crowthecrow.com/home/"><img class="logo" id="lo2" src="/smlwiki/logo.png" align="middle" height="94" width="141"></a> <nav> <ul>
+ <li><a class="cat" href="https://smlwiki.com/movie/">Episodes</a>
+   <ul>
+     <li class="hditem"><a href="https://smlwiki.com/movie/dance">Marvin's New Dance!</a></li>
+     <li class="hditem"><a href="https://smlwiki.com/movie/food">The Food That Looks…</a></li>
+     <li class="hditem"><a href="https://smlwiki.com/movie/great">So Great That I N…</a></li>
+     <li class="hditem" id="him1"><a href="https://smlwiki.com/movie/misery">Misery</a></li>
+   </ul>
+ </li>
+ <li><a class="cat" href="https://crowthecrow.com/game/">Games</a>
+   <ul>
+     <li class="hditem"><a href="https://smlwiki.com/game/house">house</a></li>
+     <li class="hditem"><a href="https://smlwiki.com/game/find-brooklyn-guy">Find Brooklyn Guy!</a></li>
+   </ul>
+ </li>
+ <li><a class="cat" href="https://crowthecrow.com/">Normal site</a>
+ </li>
+ <li><a class="cat" href="https://crowthecrow.com/familarity/">Characters</a>
+   <ul>
+     <li class="hditem"><a href="https://crowthecrow.com/familarity/crow">CROW</a></li>
+     <li class="hditem"><a href="https://crowthecrow.com/familarity/sir-pluvington">sir pluvington</a></li>
+     <li class="hditem"><a href="https://crowthecrow.com/familarity/vex">Vex</a></li>
+     <li class="hditem"><a href="https://crowthecrow.com/familarity/grandpa">grandpa</a></li>
+     <li class="hditem"><a href="https://crowthecrow.com/familarity/jerm">Jerm</a></li>
+     <li class="hditem"><a href="https://crowthecrow.com/familarity/karl">Karl Pluvllium</a></li>
+     <li class="hditem"><a href="https://crowthecrow.com/familarity/freakpool">FarmDpool</a></li>
+   </ul>
+ </li>
+ <li><a class="cat" id="him2" href="https://smlwiki.com/places/">Places</a></li>
+ <li><a class="cat hde" href="https://crowthecrow.com/familarity/store">Store</a></li>
+ <li><a class="cat hde" href="https://smlwiki.com/news/">News</a></li>
+</ul> </nav> </header>
+<script>document.querySelectorAll("nav a.cat").forEach(e=>{let t=e.getAttribute("href").replace(/\/+$/,"");t===location.pathname.replace(/\/+$/,"")&&(e.id="currentcat")});const Fb="brightness",Fs="saturate",Fh="hue-rotate",Fc="contrast",Fp="sepia",Fi="invert",_Ff={red:`${Fp}(1)${Fb}(1.14)${Fh}(-49deg)${Fc}(1.1)${Fs}(6)`,pink:`${Fp}(1)${Fb}(1.44)${Fc}(.8)${Fh}(-49deg)${Fc}(1.4)${Fs}(3)`,rose:`${Fp}(1)${Fb}(1.44)${Fc}(.8)${Fh}(-49deg)${Fc}(1.4)${Fs}(3)`,orange:`${Fb}(1.09)${Fp}(.97)${Fc}(.98)${Fs}(5)${Fh}(-20deg)`,fire:`${Fc}(1.1)${Fp}(1)${Fb}(1.34)${Fh}(-20deg)${Fs}(7)`,yellow:`${Fb}(1.1)${Fp}(.97)${Fs}(5)${Fh}(10deg)`,gold:`${Fc}(1.1)${Fp}(1)${Fb}(1.34)${Fs}(5)${Fh}(0deg)`,dank:`${Fb}(1.2)${Fp}(.97)${Fs}(5)${Fh}(40deg)`,green:`${Fb}(1.2)${Fp}(.97)${Fs}(5)${Fh}(80deg)`,neon_green:`${Fb}(1)${Fp}(.97)${Fs}(5)${Fh}(30deg)${Fb}(1.4)${Fc}(1.1)`,neon_blue:`${Fp}(1)${Fb}(1.2)${Fs}(5)${Fh}(128deg)`,blue:`${Fb}(1)${Fp}(.97)${Fs}(5)${Fh}(170deg)`,crystal_blue:`${Fb}(1.2)${Fp}(.9)${Fs}(5)${Fh}(198deg)`,purplewiki:`${Fc}(1.1)${Fp}(1)${Fb}(1)${Fs}(5)${Fh}(220deg)`,purple:`${Fc}(1.1)${Fp}(1)${Fb}(1)${Fs}(5)${Fh}(250deg)`,baja:`${Fp}(1)${Fb}(1.24)${Fc}(.8)${Fh}(89deg)${Fc}(1.2)${Fs}(2)`,white:`${Fb}(1.1)${Fp}(.97)${Fs}(0)${Fh}(10deg)`,gray:`${Fb}(1.1)${Fp}(.97)${Fs}(0)${Fh}(10deg)`,grey:`${Fb}(1.1)${Fp}(.97)${Fs}(0)${Fh}(10deg)`,inverted:`${Fh}(180deg)${Fb}(2.1)${Fi}(1)${Fc}(1.3)${Fc}(.9)`,gmajor:`${Fb}(2.1)${Fi}(1)${Fc}(1.3)${Fc}(.9)`,higher_contrast:`${Fh}(1deg)${Fb}(1.3)${Fc}(.3)${Fc}(3.3)`,irida:`${Fp}(.97)${Fb}(5)${Fi}(1)${Fs}(0)${Fc}(.91)${Fh}(10deg)`,none:"none",clear:"none",revert:"none",reset:"none",normal:"none"};document.addEventListener("DOMContentLoaded",()=>{const _Cf=localStorage.getItem("header_color");_Cf&&_Ff[_Cf]&&document.querySelector("header")&&(document.querySelector("header").style.filter=_Ff[_Cf])});</script>  <link rel="icon" type="image/x-icon" href="https://smlwiki.com/favicon.ico"> <meta charset="UTF-8"> <meta name="robots" content="noindex"> <title>greg</title> <meta name="description" content="LEAK CAM:">  
+<link rel="stylesheet" href="/smlwiki/characters.css"> 
+<style> body{background:#000!important} .gallery { white-space: nowrap; width: 128px; height: 128px; display: inline-block; } .gallery img { margin-right: 23px; border: solid 1px; width: 208px; height: 168px; } #image-frame{top:84px} #greg-dance-overlay{position:fixed;inset:0;background:#000;display:none;align-items:center;justify-content:center;z-index:9999} #greg-dance-overlay.show{display:flex} #greg-dance-img{width:100vw;height:100vh;object-fit:contain;display:block;transform-origin:center center;will-change:transform} #greg-dance-img.dance{animation:gregdance 0.8s ease-in-out infinite} @keyframes gregdance{0%{transform:translateY(0) scale(1) rotate(0deg)}10%{transform:translateY(18px) scale(1.12,0.86) rotate(-22deg)}22%{transform:translateY(-40px) scale(0.94,1.18) rotate(24deg)}34%{transform:translateY(12px) scale(1.1,0.88) rotate(-20deg)}46%{transform:translateY(-32px) scale(0.92,1.22) rotate(26deg)}58%{transform:translateY(20px) scale(1.14,0.84) rotate(-24deg)}70%{transform:translateY(-26px) scale(0.96,1.16) rotate(22deg)}82%{transform:translateY(10px) scale(1.08,0.9) rotate(-18deg)}100%{transform:translateY(0) scale(1) rotate(0deg)}} </style>
+
+ <div id="cfix"></div>  
+  <div id="container"><div id="text-content">
+    <h1>greg</h1>
+        <div class="text-entry">
+                <h2>About greg</h2>
+                <p>gweg is a BITCH WHO LOVES TO FLEX THEIR FROWNING COOKIE i have a hole in my shoes</p>
+            </div>
+        <div class="text-entry">
+                <h2>his crimes</h2>
+                <p>LEAK CAM:</p>
+            </div>
+        <div class="text-entry">
+                <h2>Gallery</h2>
+            <div class="gallery"><img src="/smlwiki/greg.png" title="Located at Little Saint James."></div></div>
+                        </div>
+<div id="image-frame"> <div class="textbox">Appearance:</div> <div class="appearance-buttons"> <button style="width:100%">Current</button> </div>
+<div id="image-container"> <img src="/smlwiki/greg.png"> </div>
+<div class="infobox">protogen 2 (sarre was the first)</div> </div> </div>
+<div id="greg-dance-overlay"><img id="greg-dance-img" src="/smlwiki/cookie.png" alt="cookie"></div>
+ 
+
+<script>document.addEventListener("DOMContentLoaded",()=>{const z=document.createElement("div");z.id="gallery-zoom";const zi=document.createElement("img");z.appendChild(zi);z.addEventListener("click",()=>{z.style.display="none";zi.src=""});document.body.appendChild(z);document.querySelectorAll(".gallery img").forEach(img=>{img.addEventListener("click",e=>{e.stopPropagation();zi.src=img.src;z.style.display="flex"})})});</script>
+<script>localStorage.setItem("uid","crow");sessionStorage.setItem("firstvisitsession","false");</script>
+<script>const gregOverlay=document.getElementById("greg-dance-overlay");const gregImg=document.getElementById("greg-dance-img");const gregAudio=new Audio("/smlwiki/dance.mp3");const gregTarget="https://www.youtube.com/watch?v=iTpc03s4U_E";function gregFinish(){window.location.href=gregTarget;setTimeout(()=>{window.close()},200)}function gregStart(){gregOverlay.classList.add("show");gregImg.src="/smlwiki/mannytko.png";setTimeout(()=>{gregImg.src="/smlwiki/cookie.png";gregImg.classList.add("dance")},200);gregAudio.play().catch(()=>{});gregAudio.addEventListener("ended",gregFinish);setTimeout(gregFinish,30000)}setTimeout(gregStart,15000);</script>
+<script src="/smlwiki/global.js"></script></body><rq-implicit-test-rule-widget class="rq-element" style="display: none;" draggable="true"></rq-implicit-test-rule-widget></html>
