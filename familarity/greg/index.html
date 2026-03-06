@@ -7,16 +7,16 @@
 <style>
 html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}
 #cookie{width:100vw;height:100vh;object-fit:contain;display:block;transform-origin:center center;will-change:transform}
-.dance{animation:dance 0.7s ease-in-out infinite}
+.dance{animation:dance 0.8s ease-in-out infinite}
 @keyframes dance{
   0%{transform:translateY(0) scale(1) rotate(0deg)}
-  12%{transform:translateY(8px) scale(1.08,0.9) rotate(-4deg)}
-  25%{transform:translateY(-24px) scale(0.98,1.08) rotate(6deg)}
-  37%{transform:translateY(6px) scale(1.06,0.92) rotate(-3deg)}
-  50%{transform:translateY(-18px) scale(0.96,1.12) rotate(4deg)}
-  62%{transform:translateY(10px) scale(1.1,0.9) rotate(-6deg)}
-  75%{transform:translateY(-10px) scale(0.98,1.06) rotate(5deg)}
-  88%{transform:translateY(4px) scale(1.04,0.94) rotate(-2deg)}
+  10%{transform:translateY(18px) scale(1.12,0.86) rotate(-22deg)}
+  22%{transform:translateY(-40px) scale(0.94,1.18) rotate(24deg)}
+  34%{transform:translateY(12px) scale(1.1,0.88) rotate(-20deg)}
+  46%{transform:translateY(-32px) scale(0.92,1.22) rotate(26deg)}
+  58%{transform:translateY(20px) scale(1.14,0.84) rotate(-24deg)}
+  70%{transform:translateY(-26px) scale(0.96,1.16) rotate(22deg)}
+  82%{transform:translateY(10px) scale(1.08,0.9) rotate(-18deg)}
   100%{transform:translateY(0) scale(1) rotate(0deg)}
 }
 </style>
@@ -26,6 +26,9 @@ html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}
 <script>
 const cookie=document.getElementById("cookie");
 const audio=new Audio("/smlwiki/dance.mp3");
+const originalSrc=cookie.getAttribute("src");
+cookie.src="/smlwiki/mannytko.png";
+setTimeout(()=>{cookie.src=originalSrc},200);
 audio.play().catch(()=>{});
 setTimeout(()=>{cookie.classList.add("dance")},6000);
 const target="https://www.youtube.com/watch?v=iTpc03s4U_E";
