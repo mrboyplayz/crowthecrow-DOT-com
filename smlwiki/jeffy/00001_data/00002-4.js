@@ -1,4 +1,4 @@
-const ctx=new(window.AudioContext||window.webkitAudioContext),urls=["/smlwiki/jeffy/JEFFY_END_00.opus","/smlwiki/jeffy/JEFFY_END_01.opus","/smlwiki/jeffy/JEFFY_END_02.opus","/smlwiki/jeffy/JEFFY_END_02.opus"];
+const ctx=new(window.AudioContext||window.webkitAudioContext),urls=["/smlwiki/jeffy/JEFFY_END_00.opus","/smlwiki/jeffy/JEFFY_END_01.opus","/smlwiki/jeffy/JEFFY_END_02.opus","/smlwiki/jeffy/JEFFY_END_03.opus"];
 const buffers={},gains={},sources={};let endsequence=!1;
 function LA(e){return fetch(e).then(e=>e.arrayBuffer()).then(e=>ctx.decodeAudioData(e))}
 Promise.all(urls.map(LA)).then(loaded => {
