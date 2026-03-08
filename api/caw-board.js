@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   const adminPass = process.env.CAW_ADMIN_PASSWORD || "";
   const adminUser = process.env.CAW_ADMIN_USERNAME || "";
   const bunnyPull = process.env.BUNNY_STORAGE_PULL || process.env["BUNNY-STORAGE-PULL"] || "";
-  const bunnyUploadEndpoint = process.env.BUNNY_UPLOAD_ENDPOINT || process.env["BUNNY-UPLOAD-ENDPOINT"] || "";
+  const bunnyUploadEndpoint = process.env.BUNNY_UPLOAD_ENDPOINT || process.env["BUNNY-UPLOAD-ENDPOINT"] || "/api/bunny-upload";
   const encoder = new TextEncoder();
   if (!url || !token) {
     res.status(500).json({ error: "missing_kv_config" });

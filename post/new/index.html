@@ -118,6 +118,7 @@ async function uploadToBunnyEndpoint(file){
     const endpoint=new URL(bunnyConfig.uploadEndpoint,location.origin);
     endpoint.searchParams.set("filename",encodeURIComponent(file.name||"upload.bin"));
     endpoint.searchParams.set("type",file.type||"application/octet-stream");
+    if(state.token)endpoint.searchParams.set("token",state.token);
     const xhr=new XMLHttpRequest();
     xhr.open("POST",endpoint.toString(),true);
     xhr.setRequestHeader("Content-Type",file.type||"application/octet-stream");
