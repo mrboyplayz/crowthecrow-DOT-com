@@ -12,6 +12,10 @@ export default async function handler(req, res) {
     res.status(405).json({ error: "method_not_allowed" });
     return;
   }
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    res.status(500).json({ error: "missing_blob_token" });
+    return;
+  }
   return handleUpload({
     req,
     res,

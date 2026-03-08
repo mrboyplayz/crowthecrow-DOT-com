@@ -169,47 +169,6 @@ function renderPosts(){
       };
       ensureActions().appendChild(del);
     }
-    const cwrap=document.createElement("div");
-    p.comments.forEach(c=>{
-      const cdiv=document.createElement("div");
-      cdiv.className="comment";
-      cdiv.innerHTML=`<div class="comment-meta">${c.user} • ${fmtTime(c.ts)}</div><div class="comment-text"></div>`;
-      cdiv.querySelector(".comment-text").textContent=c.text;
-      if(isAdmin()){
-        const cbtn=document.createElement("button");
-        cbtn.className="btn";
-        cbtn.textContent="Delete Comment";
-        cbtn.onclick=async()=>{
-          setStatus("");
-          const ok=await apiPost("admin_delete_comment",{token:state.token,postId:p.id,commentId:c.id});
-          if(!ok){setStatus("admin delete failed");return}
-          await fetchPosts();
-        };
-        cdiv.appendChild(cbtn);
-      }
-      cwrap.appendChild(cdiv);
-    });
-    if(state.sessionUser){
-      const form=document.createElement("div");
-      form.className="comment";
-      const inp=document.createElement("input");
-      inp.className="input";
-      inp.placeholder="comment";
-      const btn=document.createElement("button");
-      btn.className="btn";
-      btn.textContent="Post Comment";
-      btn.onclick=async()=>{
-        const text=inp.value.trim();
-        if(!text)return;
-        setStatus("");
-        const ok=await apiPost("comment",{token:state.token,postId:p.id,text});
-        if(!ok){setStatus("comment failed");return}
-        await fetchPosts();
-      };
-      form.append(inp,btn);
-      cwrap.appendChild(form);
-    }
-    body.appendChild(cwrap);
     wrap.append(head,body);
     postsEl.appendChild(wrap);
   });

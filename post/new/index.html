@@ -102,7 +102,7 @@ function loadState(){
   state.token=LS.getItem(KEY)||"";
 }
 async function uploadToBlob(file){
-  if(!state.token)return null;
+  if(!state.token)return {url:null,error:"sign in required"};
   try{
     const result=await upload(file.name||"upload.bin",file,{
       access:"public",
@@ -114,9 +114,10 @@ async function uploadToBlob(file){
         showProgress(pct);
       }
     });
-    return result?.url||null;
-  }catch{
-    return null;
+    return {url:result?.url||null,error:result?.url?null:"blob upload failed"};
+  }catch(err){
+    const message=String(err?.message||err||"blob upload failed");
+    return {url:null,error:message};
   }
 }
 function supportsCompression(){
@@ -206,9 +207,9 @@ async function postFromFile(file,type,title){
   }
   setStatus("uploading...");
   showProgress(0);
-  const blobUrl=await uploadToBlob(uploadFile);
-  if(!blobUrl){setStatus("blob upload failed");hideProgress();return}
-  const resp=await apiPost("create_post",{token:state.token,title,type,url:blobUrl},45000);
+  const blobResult=await uploadToBlob(uploadFile);
+  if(!blobResult?.url){setStatus(blobResult?.error||"blob upload failed");hideProgress();return}
+  const resp=await apiPost("create_post",{token:state.token,title,type,url:blobResult.url},45000);
   const postId=resp?.post?.id||resp?.id||"";
   if(!resp||!postId){setStatus("post save failed");hideProgress();return}
   location.href=`/post/?id=${encodeURIComponent(postId)}`;
