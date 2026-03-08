@@ -92,7 +92,6 @@ const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
-const oauthUrl=apiBase?`${apiBase}/api/discord-oauth`:"/api/discord-oauth";
 const KEYS={token:"caw_session_token"};
 const state={posts:[],users:[],sessionUser:null,token:"",isAdmin:false,isVerified:false,discordName:""};
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
@@ -112,6 +111,12 @@ async function apiPost(action,body){
   const resp=await fetch(url,{method:"POST",headers,body:JSON.stringify(body||{})});
   if(!resp.ok)return null;
   return resp.json();
+}
+function discordStartUrl(){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action","discord_start");
+  url.searchParams.set("token",state.token);
+  return url.toString();
 }
 function loadState(){
   state.token=LS.getItem(KEYS.token)||"";
@@ -178,6 +183,90 @@ function renderUsers(){
     listEl.appendChild(row);
   });
 }
+function extFromUrl(url){
+  try{
+    const parsed=new URL(url);
+    const parts=parsed.pathname.split("/").filter(Boolean);
+    const last=parts.length?parts[parts.length-1]:"";
+    const dot=last.lastIndexOf(".");
+    return dot>-1?last.slice(dot+1).toLowerCase():"";
+  }catch{
+    return "";
+  }
+}
+function embedFromUrl(url){
+  try{
+    const parsed=new URL(url);
+    const host=parsed.hostname.replace(/^www\./,"").toLowerCase();
+    if(host==="youtu.be"){
+      const id=parsed.pathname.split("/").filter(Boolean)[0];
+      if(id)return `https://www.youtube-nocookie.com/embed/${id}`;
+    }
+    if(host==="youtube.com"){
+      if(parsed.pathname==="/watch"){
+        const id=parsed.searchParams.get("v");
+        if(id)return `https://www.youtube-nocookie.com/embed/${id}`;
+      }
+      if(parsed.pathname.startsWith("/shorts/")){
+        const id=parsed.pathname.split("/").filter(Boolean)[1];
+        if(id)return `https://www.youtube-nocookie.com/embed/${id}`;
+      }
+      if(parsed.pathname.startsWith("/embed/")){
+        return url;
+      }
+    }
+    if(host==="vimeo.com"){
+      const id=parsed.pathname.split("/").filter(Boolean)[0];
+      if(id)return `https://player.vimeo.com/video/${id}`;
+    }
+  }catch{}
+  return "";
+}
+function buildMedia(url,type){
+  if(!url)return null;
+  if(url.startsWith("data:")){
+    return {kind:type==="video"?"video":"img",src:url};
+  }
+  const ext=extFromUrl(url);
+  if(["jpg","jpeg","png","gif","webp","avif","bmp","svg"].includes(ext)){
+    return {kind:"img",src:url};
+  }
+  if(["mp4","webm","ogg","mov","m4v"].includes(ext)){
+    return {kind:"video",src:url};
+  }
+  const embed=embedFromUrl(url);
+  if(embed){
+    return {kind:"iframe",src:embed};
+  }
+  return {kind:type==="video"?"video":"img",src:url,fallback:true};
+}
+function renderMedia(body,post){
+  const spec=buildMedia(post.url,post.type);
+  if(!spec)return;
+  if(spec.kind==="iframe"){
+    const frame=document.createElement("iframe");
+    frame.src=spec.src;
+    frame.className="post-media";
+    frame.setAttribute("allow","accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+    frame.setAttribute("allowfullscreen","true");
+    body.appendChild(frame);
+    return;
+  }
+  const media=document.createElement(spec.kind==="video"?"video":"img");
+  media.className="post-media";
+  media.src=spec.src;
+  if(spec.kind==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
+  body.appendChild(media);
+  if(spec.fallback){
+    const link=document.createElement("a");
+    link.className="post-link";
+    link.href=post.url;
+    link.target="_blank";
+    link.rel="noreferrer";
+    link.textContent="Open link";
+    body.appendChild(link);
+  }
+}
 function renderPosts(){
   const postsEl=qs("#posts");
   postsEl.innerHTML="";
@@ -191,11 +280,7 @@ function renderPosts(){
     head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/?id=${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
     const body=document.createElement("div");
     body.className="post-body";
-    const media=document.createElement(p.type==="video"?"video":"img");
-    media.className="post-media";
-    media.src=p.url;
-    if(p.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
-    body.appendChild(media);
+    renderMedia(body,p);
     let actions=null;
     const ensureActions=()=>{
       if(actions)return actions;
@@ -284,10 +369,7 @@ function wire(){
   qs("#load-users-btn").onclick=adminLoadUsers;
   qs("#verify-btn").onclick=()=>{
     if(!state.token)return;
-    const url=new URL(oauthUrl,location.origin);
-    url.searchParams.set("action","start");
-    url.searchParams.set("token",state.token);
-    location.href=url.toString();
+    location.href=discordStartUrl();
   };
 }
 loadState();

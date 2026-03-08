@@ -69,7 +69,6 @@ const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
-const oauthUrl=apiBase?`${apiBase}/api/discord-oauth`:"/api/discord-oauth";
 const KEY="caw_session_token";
 const state={token:"",isVerified:false};
 const MAX_UPLOAD=4*1024*1024;
@@ -100,6 +99,12 @@ async function apiPost(action,body,timeoutMs=30000){
   }finally{
     clearTimeout(timer);
   }
+}
+function discordStartUrl(){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action","discord_start");
+  url.searchParams.set("token",state.token);
+  return url.toString();
 }
 function loadState(){
   state.token=LS.getItem(KEY)||"";
@@ -255,10 +260,7 @@ function postCreate(){
 qs("#post-btn").onclick=postCreate;
 qs("#verify-btn").onclick=()=>{
   if(!state.token)return;
-  const url=new URL(oauthUrl,location.origin);
-  url.searchParams.set("action","start");
-  url.searchParams.set("token",state.token);
-  location.href=url.toString();
+  location.href=discordStartUrl();
 };
 loadState();
 refreshSession();
