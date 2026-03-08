@@ -63,8 +63,9 @@ const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
+const oauthUrl=apiBase?`${apiBase}/api/discord-oauth`:"/api/discord-oauth";
 const KEYS={token:"caw_session_token"};
-const state={token:"",sessionUser:null,isAdmin:false,post:null,posts:[]};
+const state={token:"",sessionUser:null,isAdmin:false,isVerified:false,post:null,posts:[]};
 const pathParts=location.pathname.split("/").filter(Boolean);
 const queryId=new URLSearchParams(location.search).get("id")||"";
 const hashId=(location.hash||"").replace(/^#/,"");
@@ -103,7 +104,16 @@ function renderAuth(){
 async function refreshSession(){
   if(!state.token){state.sessionUser=null;renderAuth();return}
   const data=await apiPost("session",{token:state.token});
-  if(!data||!data.user){setToken("");state.sessionUser=null;state.isAdmin=false}else{state.sessionUser=data.user;state.isAdmin=!!data.admin}
+  if(!data||!data.user){
+    setToken("");
+    state.sessionUser=null;
+    state.isAdmin=false;
+    state.isVerified=false;
+  }else{
+    state.sessionUser=data.user;
+    state.isAdmin=!!data.admin;
+    state.isVerified=!!data.verified||state.isAdmin;
+  }
   renderAuth();
 }
 function renderPost(){
@@ -181,7 +191,7 @@ function renderPost(){
     }
     cwrap.appendChild(cdiv);
   });
-  if(state.sessionUser){
+  if(state.sessionUser&&state.isVerified){
     const form=document.createElement("div");
     form.className="comment";
     const inp=document.createElement("input");
@@ -199,6 +209,23 @@ function renderPost(){
       await fetchPost(post.id);
     };
     form.append(inp,btn);
+    cwrap.appendChild(form);
+  }else if(state.sessionUser){
+    const form=document.createElement("div");
+    form.className="comment";
+    const msg=document.createElement("div");
+    msg.className="muted";
+    msg.textContent="Verify Discord to comment.";
+    const btn=document.createElement("button");
+    btn.className="btn";
+    btn.textContent="Verify Discord";
+    btn.onclick=()=>{
+      const url=new URL(oauthUrl,location.origin);
+      url.searchParams.set("action","start");
+      url.searchParams.set("token",state.token);
+      location.href=url.toString();
+    };
+    form.append(msg,btn);
     cwrap.appendChild(form);
   }
   body.appendChild(cwrap);

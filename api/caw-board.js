@@ -118,9 +118,10 @@ export default async function handler(req, res) {
     const next = {};
     for (const [key, value] of Object.entries(sessions)) {
       if (value && typeof value === "object" && typeof value.user === "string") {
-        next[key] = { user: value.user, admin: !!value.admin };
+        const discordState = typeof value.discordState === "string" ? value.discordState : "";
+        next[key] = { user: value.user, admin: !!value.admin, discordState };
       } else if (typeof value === "string") {
-        next[key] = { user: value, admin: false };
+        next[key] = { user: value, admin: false, discordState: "" };
       }
     }
     return next;
@@ -128,6 +129,10 @@ export default async function handler(req, res) {
   async function loadSessions() {
     const sessions = (await kvGet(SESSIONS_KEY, {})) || {};
     return normalizeSessions(sessions);
+  }
+  async function loadUsers() {
+    const users = (await kvGet(USERS_KEY, {})) || {};
+    return users && typeof users === "object" && !Array.isArray(users) ? users : {};
   }
   try {
     if (req.method === "GET" && action === "posts") {
@@ -243,7 +248,11 @@ export default async function handler(req, res) {
         res.status(404).json({ error: "not_found" });
         return;
       }
-      res.status(200).json({ ok: true, user: session.user, admin: !!session.admin });
+      const users = await loadUsers();
+      const userInfo = users[session.user] || {};
+      const verified = !!userInfo.discordId;
+      const discordName = String(userInfo.discordGlobalName || userInfo.discordUsername || "");
+      res.status(200).json({ ok: true, user: session.user, admin: !!session.admin, verified, discordName });
       return;
     }
     if (req.method === "POST" && action === "create_post") {
@@ -262,6 +271,12 @@ export default async function handler(req, res) {
       const session = sessions[tokenValue];
       if (!session || !session.user) {
         res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const users = await loadUsers();
+      const userInfo = users[session.user] || {};
+      if (!session.admin && !userInfo.discordId) {
+        res.status(403).json({ error: "discord_required" });
         return;
       }
       if (urlField.startsWith("data:")) {
@@ -306,6 +321,12 @@ export default async function handler(req, res) {
       const session = sessions[tokenValue];
       if (!session || !session.user) {
         res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const users = await loadUsers();
+      const userInfo = users[session.user] || {};
+      if (!session.admin && !userInfo.discordId) {
+        res.status(403).json({ error: "discord_required" });
         return;
       }
       const posts = (await kvGet(POSTS_KEY, [])) || [];
@@ -419,10 +440,51 @@ export default async function handler(req, res) {
       const users = (await kvGet(USERS_KEY, {})) || {};
       const list = Object.entries(users).map(([user, info]) => ({
         user,
-        created: Number(info?.created || 0)
+        created: Number(info?.created || 0),
+        verified: !!info?.discordId,
+        discordId: String(info?.discordId || ""),
+        discordName: String(info?.discordGlobalName || info?.discordUsername || "")
       }));
       list.sort((a, b) => b.created - a.created);
       res.status(200).json({ ok: true, users: list });
+      return;
+    }
+    if (req.method === "POST" && action === "admin_delete_user") {
+      const tokenValue = String(body?.token || "");
+      const username = cleanUser(body?.username);
+      if (!tokenValue || !username) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const sessions = await loadSessions();
+      const session = sessions[tokenValue];
+      if (!session || !session.admin) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const users = (await kvGet(USERS_KEY, {})) || {};
+      if (!users[username]) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      delete users[username];
+      const okUsers = await kvSet(USERS_KEY, users);
+      if (!okUsers) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      const nextSessions = await loadSessions();
+      for (const [key, value] of Object.entries(nextSessions)) {
+        if (value && value.user === username) delete nextSessions[key];
+      }
+      await kvSet(SESSIONS_KEY, nextSessions);
+      let posts = (await kvGet(POSTS_KEY, [])) || [];
+      posts = Array.isArray(posts) ? posts.filter(p => p.user !== username).map(p => ({
+        ...p,
+        comments: Array.isArray(p.comments) ? p.comments.filter(c => c.user !== username) : []
+      })) : [];
+      await kvSet(POSTS_KEY, posts);
+      res.status(200).json({ ok: true });
       return;
     }
     if (req.method === "POST" && action === "admin_delete_comment") {

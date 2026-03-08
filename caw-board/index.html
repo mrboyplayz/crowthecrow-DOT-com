@@ -59,6 +59,12 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
           <h3>Rules</h3>
           <div class="muted">no Porn buddy this is a meme image board send bullshit idk just dont make it porn looking at you GREG.</div>
         </div>
+        <div id="verify-panel" class="panel hidden">
+          <h3>Discord Verification</h3>
+          <div class="muted">Verify to post and comment.</div>
+          <button id="verify-btn" class="btn" style="margin-top:6px">Verify Discord</button>
+          <div id="verify-status" class="muted" style="margin-top:6px"></div>
+        </div>
         <div id="admin-panel" class="panel hidden">
           <h3>Admin</h3>
           <button id="wipe-btn" class="btn">Wipe All Posts</button>
@@ -86,8 +92,9 @@ const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
+const oauthUrl=apiBase?`${apiBase}/api/discord-oauth`:"/api/discord-oauth";
 const KEYS={token:"caw_session_token"};
-const state={posts:[],users:[],sessionUser:null,token:"",isAdmin:false};
+const state={posts:[],users:[],sessionUser:null,token:"",isAdmin:false,isVerified:false,discordName:""};
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 async function apiGet(action,params){
@@ -119,22 +126,57 @@ function renderAuth(){
   qs("#auth-logged-out").classList.toggle("hidden",loggedIn);
   qs("#auth-logged-in").classList.toggle("hidden",!loggedIn);
   qs("#session-user").textContent=state.sessionUser?`${state.sessionUser}${state.isAdmin?" (admin)":""}`:"";
-  qs("#post-locked").classList.toggle("hidden",loggedIn);
-  qs("#post-link").classList.toggle("hidden",!loggedIn);
+  qs("#post-locked").classList.toggle("hidden",loggedIn&&state.isVerified);
+  qs("#post-link").classList.toggle("hidden",!loggedIn||!state.isVerified);
+  if(loggedIn&&!state.isVerified){
+    qs("#post-locked").textContent="Verify Discord to post.";
+  }else{
+    qs("#post-locked").textContent="Sign in to post.";
+  }
   qs("#admin-panel").classList.toggle("hidden",!state.isAdmin);
   if(!state.isAdmin){
     state.users=[];
     renderUsers();
+  }
+  renderVerify();
+}
+function renderVerify(){
+  const show=!!state.sessionUser&&!state.isVerified;
+  qs("#verify-panel").classList.toggle("hidden",!show);
+  if(show){
+    const label=state.discordName?`Connected: ${state.discordName}`:"Not verified";
+    qs("#verify-status").textContent=label;
+  }else{
+    qs("#verify-status").textContent="";
   }
 }
 function renderUsers(){
   const listEl=qs("#users-list");
   if(!listEl)return;
   if(!state.isAdmin||!state.users.length){listEl.textContent="";return}
-  listEl.textContent=state.users.map(u=>{
+  listEl.innerHTML="";
+  state.users.forEach(u=>{
+    const row=document.createElement("div");
     const created=u.created?` • ${fmtTime(u.created)}`:"";
-    return `${u.user}${created}`;
-  }).join("\n");
+    const verified=u.verified?" • verified":" • unverified";
+    const discord=u.discordId?` • ${u.discordId}`:"";
+    const label=document.createElement("div");
+    label.textContent=`${u.user}${created}${verified}${discord}`;
+    const terminate=document.createElement("button");
+    terminate.className="btn";
+    terminate.textContent="Terminate";
+    terminate.onclick=async()=>{
+      if(!confirm(`Terminate ${u.user}?`))return;
+      setStatus("");
+      const ok=await apiPost("admin_delete_user",{token:state.token,username:u.user});
+      if(!ok){setStatus("terminate failed");return}
+      state.users=state.users.filter(x=>x.user!==u.user);
+      renderUsers();
+      setStatus(`terminated ${u.user}`);
+    };
+    row.append(label,terminate);
+    listEl.appendChild(row);
+  });
 }
 function renderPosts(){
   const postsEl=qs("#posts");
@@ -222,13 +264,31 @@ async function fetchPosts(){
 async function refreshSession(){
   if(!state.token){state.sessionUser=null;renderAuth();return}
   const data=await apiPost("session",{token:state.token});
-  if(!data||!data.user){setToken("");state.sessionUser=null;state.isAdmin=false}else{state.sessionUser=data.user;state.isAdmin=!!data.admin}
+  if(!data||!data.user){
+    setToken("");
+    state.sessionUser=null;
+    state.isAdmin=false;
+    state.isVerified=false;
+    state.discordName="";
+  }else{
+    state.sessionUser=data.user;
+    state.isAdmin=!!data.admin;
+    state.isVerified=!!data.verified||state.isAdmin;
+    state.discordName=data.discordName||"";
+  }
   renderAuth();
 }
 function wire(){
   qs("#logout-btn").onclick=logout;
   qs("#wipe-btn").onclick=adminWipe;
   qs("#load-users-btn").onclick=adminLoadUsers;
+  qs("#verify-btn").onclick=()=>{
+    if(!state.token)return;
+    const url=new URL(oauthUrl,location.origin);
+    url.searchParams.set("action","start");
+    url.searchParams.set("token",state.token);
+    location.href=url.toString();
+  };
 }
 loadState();
 wire();

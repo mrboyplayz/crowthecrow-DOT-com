@@ -52,6 +52,10 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
       </div>
       <button id="post-btn" class="btn" style="margin-top:8px">Post</button>
     </div>
+    <div id="verify-panel" class="hidden" style="margin-top:6px">
+      <div class="muted">Verify Discord to post.</div>
+      <button id="verify-btn" class="btn" style="margin-top:6px">Verify Discord</button>
+    </div>
     <div id="status" class="muted" style="margin-top:6px"></div>
     <progress id="upload-progress" class="progress hidden" max="100" value="0"></progress>
     <div class="links">
@@ -65,8 +69,9 @@ const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
+const oauthUrl=apiBase?`${apiBase}/api/discord-oauth`:"/api/discord-oauth";
 const KEY="caw_session_token";
-const state={token:""};
+const state={token:"",isVerified:false};
 const MAX_UPLOAD=4*1024*1024;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function showProgress(value){
@@ -177,6 +182,14 @@ async function refreshSession(){
     setStatus("session expired");
     return;
   }
+  state.isVerified=!!data.verified||!!data.admin;
+  if(!state.isVerified){
+    qs("#post-form").classList.add("hidden");
+    qs("#post-locked").classList.add("hidden");
+    qs("#verify-panel").classList.remove("hidden");
+  }else{
+    qs("#verify-panel").classList.add("hidden");
+  }
 }
 async function postFromFile(file,type,title){
   if(file.size>MAX_UPLOAD){setStatus("file too big for server upload, use URL");return}
@@ -233,12 +246,20 @@ function postCreate(){
   const url=qs("#post-url").value.trim();
   const file=qs("#post-file").files[0];
   setStatus("");
+  if(!state.isVerified){setStatus("verify discord to post");return}
   const title=deriveTitle({title:rawTitle,file,url});
   if(file){postFromFile(file,type,title);return}
   if(url){postFromUrl(url,type,title);return}
   setStatus("add a file or url");
 }
 qs("#post-btn").onclick=postCreate;
+qs("#verify-btn").onclick=()=>{
+  if(!state.token)return;
+  const url=new URL(oauthUrl,location.origin);
+  url.searchParams.set("action","start");
+  url.searchParams.set("token",state.token);
+  location.href=url.toString();
+};
 loadState();
 refreshSession();
 </script>
