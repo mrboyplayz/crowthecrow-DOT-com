@@ -51,6 +51,8 @@ const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.c
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEY="caw_session_token";
 const state={token:""};
+const MAX_UPLOAD=30*1024*1024;
+const MAX_VERCEL_UPLOAD=4*1024*1024;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function showProgress(value){
   const el=qs("#upload-progress");
@@ -64,12 +66,20 @@ function hideProgress(){
   el.classList.add("hidden");
   el.value=0;
 }
-async function apiPost(action,body){
+async function apiPost(action,body,timeoutMs=30000){
   const url=new URL(apiUrl,location.origin);
   url.searchParams.set("action",action);
-  const resp=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
-  if(!resp.ok)return null;
-  return resp.json();
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    const resp=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{}),signal:controller.signal});
+    if(!resp.ok)return null;
+    return resp.json();
+  }catch{
+    return null;
+  }finally{
+    clearTimeout(timer);
+  }
 }
 function loadState(){
   state.token=LS.getItem(KEY)||"";
@@ -88,7 +98,8 @@ async function refreshSession(){
   }
 }
 async function postFromFile(file,type,title){
-  if(file.size>30*1024*1024){setStatus("file too big, use a URL");return}
+  if(file.size>MAX_UPLOAD){setStatus("file too big, use a URL");return}
+  if(apiBase&&file.size>MAX_VERCEL_UPLOAD){setStatus("file too big for server upload, use a URL");return}
   const r=new FileReader();
   r.onloadstart=()=>{setStatus("reading file...");showProgress(0)};
   r.onprogress=e=>{
@@ -100,9 +111,9 @@ async function postFromFile(file,type,title){
   r.onload=async()=>{
     setStatus("uploading...");
     showProgress(null);
-    const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result});
+    const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result},45000);
     const postId=resp?.post?.id||resp?.id||"";
-    if(!resp||!postId){setStatus("post failed");hideProgress();return}
+    if(!resp||!postId){setStatus("upload failed or timed out");hideProgress();return}
     location.href=`/post/?id=${encodeURIComponent(postId)}`;
   };
   r.onerror=()=>{setStatus("file read failed");hideProgress()};

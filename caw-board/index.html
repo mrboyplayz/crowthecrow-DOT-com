@@ -20,8 +20,8 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .btn:active{transform:translateY(1px)}
 .muted{color:#a7a7a7;font-size:11px}
 .warn{color:#ffb3b3;font-size:12px}
-#posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
-.post{background:#1e1e1e;border:2px solid #111;margin-bottom:12px}
+#posts{column-count:5;column-gap:10px}
+.post{background:#1e1e1e;border:2px solid #111;margin-bottom:10px;break-inside:avoid;display:inline-block;width:100%}
 .post-head{background:#2f2f2f;padding:6px 10px;border-bottom:1px solid #111}
 .post-title{font-weight:700;color:#ffe3a3}
 .post-meta{font-size:11px;color:#bdbdbd}
