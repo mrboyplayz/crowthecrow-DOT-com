@@ -63,6 +63,7 @@ export default async function handler(req, res) {
   return handleUpload({
     req,
     res,
+    token: process.env.BLOB_READ_WRITE_TOKEN,
     onBeforeGenerateToken: async (pathname, clientPayload) => {
       let payload = {};
       try {
