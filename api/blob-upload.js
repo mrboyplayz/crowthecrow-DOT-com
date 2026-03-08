@@ -32,9 +32,11 @@ export default async function handler(req, res) {
       if (!tokenValue) {
         throw new Error("unauthorized");
       }
+      const originHeader = req.headers.origin;
       const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
       const proto = req.headers["x-forwarded-proto"] || "https";
-      const sessionUrl = `${proto}://${host}/api/caw-board?action=session`;
+      const baseUrl = originHeader || `${proto}://${host}`;
+      const sessionUrl = `${baseUrl}/api/caw-board?action=session`;
       const sessionResp = await fetch(sessionUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
