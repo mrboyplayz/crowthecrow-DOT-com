@@ -50,6 +50,11 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
           <option value="1200000">1200kbps</option>
         </select>
       </div>
+      <div class="hidden">
+        <input id="cloud-enabled" type="checkbox" checked>
+        <input id="cloud-name" class="input" placeholder="cloud name">
+        <input id="cloud-preset" class="input" placeholder="unsigned upload preset">
+      </div>
       <button id="post-btn" class="btn" style="margin-top:8px">Post</button>
     </div>
     <div id="status" class="muted" style="margin-top:6px"></div>
@@ -69,6 +74,7 @@ const KEY="caw_session_token";
 const state={token:""};
 const MAX_UPLOAD=30*1024*1024;
 const MAX_VERCEL_UPLOAD=4*1024*1024;
+const CLOUD_KEYS={enabled:"caw_cloud_enabled",name:"caw_cloud_name",preset:"caw_cloud_preset"};
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function showProgress(value){
   const el=qs("#upload-progress");
@@ -99,6 +105,17 @@ async function apiPost(action,body,timeoutMs=30000){
 }
 function loadState(){
   state.token=LS.getItem(KEY)||"";
+  const enabled=LS.getItem(CLOUD_KEYS.enabled);
+  if(enabled!=null)qs("#cloud-enabled").checked=enabled==="1";
+  const name=LS.getItem(CLOUD_KEYS.name)||"dicbdelt3";
+  const preset=LS.getItem(CLOUD_KEYS.preset)||"caw_upload";
+  qs("#cloud-name").value=name;
+  qs("#cloud-preset").value=preset;
+}
+function saveCloud(){
+  LS.setItem(CLOUD_KEYS.enabled,qs("#cloud-enabled").checked?"1":"0");
+  LS.setItem(CLOUD_KEYS.name,qs("#cloud-name").value.trim());
+  LS.setItem(CLOUD_KEYS.preset,qs("#cloud-preset").value.trim());
 }
 function supportsCompression(){
   return typeof MediaRecorder!=="undefined"&&typeof HTMLCanvasElement!=="undefined";
@@ -173,7 +190,6 @@ async function refreshSession(){
 }
 async function postFromFile(file,type,title){
   if(file.size>MAX_UPLOAD){setStatus("file too big, use a URL");return}
-  if(apiBase&&file.size>MAX_VERCEL_UPLOAD&&type!=="video"){setStatus("file too big for server upload, use a URL");return}
   const shouldCompress=type==="video"&&qs("#compress-video").checked;
   let uploadFile=file;
   if(shouldCompress){
@@ -185,29 +201,32 @@ async function postFromFile(file,type,title){
     const blob=await compressVideo(file,maxWidth,bitrate);
     if(!blob){setStatus("compression failed");hideProgress();return}
     uploadFile=new File([blob],file.name.replace(/\.[^/.]+$/,"")+".webm",{type:blob.type||"video/webm"});
-    if(apiBase&&uploadFile.size>MAX_VERCEL_UPLOAD){setStatus("compressed file still too big, use a URL");hideProgress();return}
-  }else{
-    if(apiBase&&file.size>MAX_VERCEL_UPLOAD){setStatus("file too big for server upload, use a URL");return}
   }
-  const r=new FileReader();
-  r.onloadstart=()=>{setStatus("reading file...");showProgress(0)};
-  r.onprogress=e=>{
-    if(e.lengthComputable){
-      const pct=Math.max(0,Math.min(100,Math.round((e.loaded/e.total)*100)));
-      showProgress(pct);
-    }
-  };
-  r.onload=async()=>{
-    setStatus("uploading...");
-    showProgress(null);
-    const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result},45000);
-    const postId=resp?.post?.id||resp?.id||"";
-    if(!resp||!postId){setStatus("upload failed or timed out");hideProgress();return}
-    location.href=`/post/?id=${encodeURIComponent(postId)}`;
-  };
-  r.onerror=()=>{setStatus("file read failed");hideProgress()};
-  r.onloadend=()=>{if(qs("#upload-progress"))showProgress(100)};
-  r.readAsDataURL(uploadFile);
+  const cloudUrl=await uploadToCloudinary(uploadFile,type);
+  if(!cloudUrl){setStatus("cloudinary upload failed");hideProgress();return}
+  await postFromUrl(cloudUrl,type,title);
+}
+async function uploadToCloudinary(file,type){
+  const enabled=qs("#cloud-enabled").checked;
+  const cloudName=qs("#cloud-name").value.trim();
+  const preset=qs("#cloud-preset").value.trim();
+  saveCloud();
+  if(!enabled||!cloudName||!preset)return null;
+  setStatus("uploading to cloudinary...");
+  showProgress(null);
+  const endpoint=`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/${type==="video"?"video":"image"}/upload`;
+  const form=new FormData();
+  form.append("file",file);
+  form.append("upload_preset",preset);
+  form.append("folder","caw-board");
+  try{
+    const resp=await fetch(endpoint,{method:"POST",body:form});
+    if(!resp.ok)return null;
+    const data=await resp.json();
+    return data.secure_url||data.url||null;
+  }catch{
+    return null;
+  }
 }
 async function postFromUrl(url,type,title){
   const resp=await apiPost("create_post",{token:state.token,title,type,url});
