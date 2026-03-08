@@ -69,7 +69,6 @@ const KEY="caw_session_token";
 const state={token:""};
 const MAX_UPLOAD=30*1024*1024;
 const MAX_VERCEL_UPLOAD=4*1024*1024;
-const bunnyConfig={pull:"",uploadEndpoint:""};
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function showProgress(value){
   const el=qs("#upload-progress");
@@ -100,51 +99,6 @@ async function apiPost(action,body,timeoutMs=30000){
 }
 function loadState(){
   state.token=LS.getItem(KEY)||"";
-}
-async function loadBunnyConfig(){
-  try{
-    const url=new URL(apiUrl,location.origin);
-    url.searchParams.set("action","bunny_config");
-    const resp=await fetch(url.toString(),{method:"GET"});
-    if(!resp.ok)return;
-    const data=await resp.json();
-    bunnyConfig.pull=String(data?.pull||"").trim();
-    bunnyConfig.uploadEndpoint=String(data?.uploadEndpoint||"").trim();
-  }catch{}
-}
-async function uploadToBunnyEndpoint(file){
-  if(!bunnyConfig.uploadEndpoint)return null;
-  return new Promise(resolve=>{
-    const endpoint=new URL(bunnyConfig.uploadEndpoint,location.origin);
-    endpoint.searchParams.set("filename",encodeURIComponent(file.name||"upload.bin"));
-    endpoint.searchParams.set("type",file.type||"application/octet-stream");
-    if(state.token)endpoint.searchParams.set("token",state.token);
-    const xhr=new XMLHttpRequest();
-    xhr.open("POST",endpoint.toString(),true);
-    xhr.setRequestHeader("Content-Type",file.type||"application/octet-stream");
-    xhr.upload.onprogress=e=>{
-      if(e.lengthComputable){
-        const pct=Math.max(0,Math.min(100,Math.round((e.loaded/e.total)*100)));
-        showProgress(pct);
-      }else{
-        showProgress(null);
-      }
-    };
-    xhr.onload=()=>{
-      if(xhr.status<200||xhr.status>=300){return resolve(null)}
-      let data=null;
-      try{data=JSON.parse(xhr.responseText||"")}catch{data=null}
-      if(data?.url)return resolve(String(data.url));
-      if(data?.path&&bunnyConfig.pull){
-        const pull=bunnyConfig.pull.replace(/^https?:\/\//,"").replace(/\/+$/,"");
-        const path=String(data.path).replace(/^\/+/,"");
-        return resolve(`https://${pull}/${path}`);
-      }
-      return resolve(null);
-    };
-    xhr.onerror=()=>resolve(null);
-    xhr.send(file);
-  });
 }
 function supportsCompression(){
   return typeof MediaRecorder!=="undefined"&&typeof HTMLCanvasElement!=="undefined";
@@ -231,17 +185,6 @@ async function postFromFile(file,type,title){
     if(!blob){setStatus("compression failed");hideProgress();return}
     uploadFile=new File([blob],file.name.replace(/\.[^/.]+$/,"")+".webm",{type:blob.type||"video/webm"});
   }
-  if(bunnyConfig.uploadEndpoint){
-    setStatus("uploading to storage...");
-    showProgress(0);
-    const url=await uploadToBunnyEndpoint(uploadFile);
-    if(!url){setStatus("storage upload failed");hideProgress();return}
-    const resp=await apiPost("create_post",{token:state.token,title,type,url},45000);
-    const postId=resp?.post?.id||resp?.id||"";
-    if(!resp||!postId){setStatus("post save failed");hideProgress();return}
-    location.href=`/post/?id=${encodeURIComponent(postId)}`;
-    return;
-  }
   if(apiBase&&uploadFile.size>MAX_VERCEL_UPLOAD){setStatus("file too big for server upload, use a URL");return}
   const r=new FileReader();
   r.onloadstart=()=>{setStatus("reading file...");showProgress(0)};
@@ -300,6 +243,6 @@ function postCreate(){
 }
 qs("#post-btn").onclick=postCreate;
 loadState();
-loadBunnyConfig().finally(refreshSession);
+refreshSession();
 </script>
 </body></html>
