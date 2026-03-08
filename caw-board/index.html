@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caw-board</title>
+<link rel="stylesheet" href="/smlwiki/header.css">
+<style>
+body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-serif}
+#header-container{position:fixed;top:0;width:100%;z-index:3;height:80px}
+#page{max-width:980px;margin:110px auto 60px;padding:0 12px}
+.board-frame{width:100%;border:3px ridge #4a4a4a;background:#222}
+.board-title{background:linear-gradient(#4b4b4b,#2c2c2c);padding:8px 12px;border-bottom:2px solid #111;font-size:20px;letter-spacing:.5px}
+.board-sub{font-size:12px;color:#c0c0c0}
+.sidebar{width:260px;vertical-align:top;background:#1f1f1f;border-right:2px solid #111;padding:12px}
+.main{vertical-align:top;padding:12px}
+.panel{background:#2a2a2a;border:2px inset #111;padding:8px;margin-bottom:10px}
+.panel h3{margin:0 0 6px 0;font-size:14px;color:#ffd17a}
+.label{font-size:12px;color:#bbb;margin-bottom:4px}
+.input, .textarea, .select{width:100%;box-sizing:border-box;background:#111;color:#e6e6e6;border:1px solid #555;padding:6px;font-size:12px}
+.textarea{min-height:70px;resize:vertical}
+.btn{background:linear-gradient(#5e5e5e,#3a3a3a);color:#fff;border:1px solid #222;padding:6px 10px;font-size:12px;cursor:pointer}
+.btn:active{transform:translateY(1px)}
+.muted{color:#a7a7a7;font-size:11px}
+.warn{color:#ffb3b3;font-size:12px}
+.post{background:#1e1e1e;border:2px solid #111;margin-bottom:12px}
+.post-head{background:#2f2f2f;padding:6px 10px;border-bottom:1px solid #111}
+.post-title{font-weight:700;color:#ffe3a3}
+.post-meta{font-size:11px;color:#bdbdbd}
+.post-body{padding:10px}
+.post-media{max-width:100%;border:1px solid #333;background:#000}
+.post-actions{margin-top:6px}
+.comment{background:#252525;border:1px solid #111;margin-top:6px;padding:6px}
+.comment-meta{font-size:11px;color:#bdbdbd}
+.comment-text{font-size:12px;color:#e8e8e8}
+.admin-tag{color:#ffcc66;font-weight:700}
+.hidden{display:none}
+</style></head>
+<body>
+<div id="header-container"></div>
+<div id="page">
+  <table class="board-frame" cellpadding="0" cellspacing="0">
+    <tr><td colspan="2">
+      <div class="board-title">Caw-board <span class="board-sub">/cb/ image + video board</span></div>
+    </td></tr>
+    <tr>
+      <td class="sidebar">
+        <div class="panel">
+          <h3>Account</h3>
+          <div class="warn">Use a completely different password from your usual passwords.</div>
+          <div id="auth-logged-out">
+            <div class="label">Create account</div>
+            <input id="signup-user" class="input" placeholder="username">
+            <input id="signup-pass" class="input" type="password" placeholder="password">
+            <input id="signup-pass2" class="input" type="password" placeholder="confirm password">
+            <button id="signup-btn" class="btn">Create Account</button>
+            <div class="label" style="margin-top:8px">Sign in</div>
+            <input id="login-user" class="input" placeholder="username">
+            <input id="login-pass" class="input" type="password" placeholder="password">
+            <button id="login-btn" class="btn">Sign In</button>
+          </div>
+          <div id="auth-logged-in" class="hidden">
+            <div class="label">Signed in as <span id="session-user"></span></div>
+            <button id="logout-btn" class="btn">Sign Out</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Admin</h3>
+          <div class="muted">Moderation is only for you. Admin password is set in Vercel.</div>
+          <div id="admin-login">
+            <div class="label">Admin login</div>
+            <input id="admin-user" class="input" placeholder="admin username">
+            <input id="admin-pass" class="input" type="password" placeholder="admin password">
+            <button id="admin-login-btn" class="btn">Admin Login</button>
+          </div>
+          <div id="admin-on" class="hidden">
+            <div class="label">Admin mode <span class="admin-tag">ON</span></div>
+            <button id="admin-logout-btn" class="btn">Admin Logout</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Rules</h3>
+          <div class="muted">no Porn buddy this is a meme image board send bullshit idk just dont make it porn looking at you GREG.</div>
+        </div>
+      </td>
+      <td class="main">
+        <div class="panel">
+          <h3>Create Post</h3>
+          <div id="post-locked" class="muted">Sign in to post.</div>
+          <div id="post-form" class="hidden">
+            <div class="label">Title</div>
+            <input id="post-title" class="input" placeholder="title">
+            <div class="label" style="margin-top:6px">Media file</div>
+            <input id="post-file" class="input" type="file" accept="image/*,video/*">
+            <div class="label" style="margin-top:6px">Or media URL</div>
+            <input id="post-url" class="input" placeholder="https://...">
+            <div class="label" style="margin-top:6px">Type</div>
+            <select id="post-type" class="select">
+              <option value="image">Image</option>
+              <option value="video">Video</option>
+            </select>
+            <button id="post-btn" class="btn" style="margin-top:8px">Post</button>
+            <div id="status" class="muted" style="margin-top:6px"></div>
+          </div>
+        </div>
+        <div id="posts"></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<script>
+const enc=new TextEncoder();
+const qs=e=>document.querySelector(e);
+const LS=localStorage;
+const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
+const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
+const KEYS={token:"caw_session_token",admin:"caw_admin_pass",adminUser:"caw_admin_user"};
+const state={posts:[],sessionUser:null,token:"",adminPass:"",adminUser:"",adminOk:false};
+function b64(bytes){return btoa(String.fromCharCode(...bytes))}
+function randomSalt(){const b=new Uint8Array(16);crypto.getRandomValues(b);return b64(b)}
+async function hashPass(pass,salt){const data=enc.encode(salt+pass);const buf=await crypto.subtle.digest("SHA-256",data);return b64(new Uint8Array(buf))}
+function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
+function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
+async function apiGet(action,params){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action",action);
+  if(params)Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+  const resp=await fetch(url);
+  if(!resp.ok)return null;
+  return resp.json();
+}
+async function apiPost(action,body,adminPass,adminUser){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action",action);
+  const headers={"Content-Type":"application/json"};
+  if(adminPass)headers["X-Admin"]=adminPass;
+  if(adminUser)headers["X-Admin-User"]=adminUser;
+  const resp=await fetch(url,{method:"POST",headers,body:JSON.stringify(body||{})});
+  if(!resp.ok)return null;
+  return resp.json();
+}
+function loadState(){
+  state.token=LS.getItem(KEYS.token)||"";
+  state.adminPass=LS.getItem(KEYS.admin)||"";
+  state.adminUser=LS.getItem(KEYS.adminUser)||"";
+}
+function setToken(token){
+  state.token=token||"";
+  if(token)LS.setItem(KEYS.token,token);else LS.removeItem(KEYS.token);
+}
+function setAdminPass(pass){
+  state.adminPass=pass||"";
+  if(pass)LS.setItem(KEYS.admin,pass);else LS.removeItem(KEYS.admin);
+}
+function setAdminUser(user){
+  state.adminUser=user||"";
+  if(user)LS.setItem(KEYS.adminUser,user);else LS.removeItem(KEYS.adminUser);
+}
+function isAdmin(){return state.adminOk}
+function renderAuth(){
+  const loggedIn=!!state.sessionUser;
+  qs("#auth-logged-out").classList.toggle("hidden",loggedIn);
+  qs("#auth-logged-in").classList.toggle("hidden",!loggedIn);
+  qs("#session-user").textContent=state.sessionUser||"";
+  qs("#post-locked").classList.toggle("hidden",loggedIn);
+  qs("#post-form").classList.toggle("hidden",!loggedIn);
+  qs("#admin-login").classList.toggle("hidden",isAdmin());
+  qs("#admin-on").classList.toggle("hidden",!isAdmin());
+}
+function renderPosts(){
+  const postsEl=qs("#posts");
+  postsEl.innerHTML="";
+  const sorted=[...state.posts].sort((a,b)=>b.ts-a.ts);
+  sorted.forEach(p=>{
+    const wrap=document.createElement("div");
+    wrap.className="post";
+    const head=document.createElement("div");
+    head.className="post-head";
+    head.innerHTML=`<div class="post-title">${p.title||"(untitled)"}</div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
+    const body=document.createElement("div");
+    body.className="post-body";
+    const media=document.createElement(p.type==="video"?"video":"img");
+    media.className="post-media";
+    media.src=p.url;
+    if(p.type==="video"){media.controls=true}
+    body.appendChild(media);
+    if(isAdmin()){
+      const actions=document.createElement("div");
+      actions.className="post-actions";
+      const del=document.createElement("button");
+      del.className="btn";
+      del.textContent="Delete Post";
+      del.onclick=async()=>{
+        setStatus("");
+        const ok=await apiPost("admin_delete_post",{postId:p.id},state.adminPass,state.adminUser);
+        if(!ok){setStatus("admin delete failed");return}
+        await fetchPosts();
+      };
+      actions.appendChild(del);
+      body.appendChild(actions);
+    }
+    const cwrap=document.createElement("div");
+    p.comments.forEach(c=>{
+      const cdiv=document.createElement("div");
+      cdiv.className="comment";
+      cdiv.innerHTML=`<div class="comment-meta">${c.user} • ${fmtTime(c.ts)}</div><div class="comment-text"></div>`;
+      cdiv.querySelector(".comment-text").textContent=c.text;
+      if(isAdmin()){
+        const cbtn=document.createElement("button");
+        cbtn.className="btn";
+        cbtn.textContent="Delete Comment";
+        cbtn.onclick=async()=>{
+          setStatus("");
+          const ok=await apiPost("admin_delete_comment",{postId:p.id,commentId:c.id},state.adminPass,state.adminUser);
+          if(!ok){setStatus("admin delete failed");return}
+          await fetchPosts();
+        };
+        cdiv.appendChild(cbtn);
+      }
+      cwrap.appendChild(cdiv);
+    });
+    if(state.session){
+      const form=document.createElement("div");
+      form.className="comment";
+      const inp=document.createElement("input");
+      inp.className="input";
+      inp.placeholder="comment";
+      const btn=document.createElement("button");
+      btn.className="btn";
+      btn.textContent="Post Comment";
+      btn.onclick=async()=>{
+        const text=inp.value.trim();
+        if(!text)return;
+        setStatus("");
+        const ok=await apiPost("comment",{token:state.token,postId:p.id,text});
+        if(!ok){setStatus("comment failed");return}
+        await fetchPosts();
+      };
+      form.append(inp,btn);
+      cwrap.appendChild(form);
+    }
+    body.appendChild(cwrap);
+    wrap.append(head,body);
+    postsEl.appendChild(wrap);
+  });
+}
+async function signup(){
+  const u=qs("#signup-user").value.trim();
+  const p=qs("#signup-pass").value;
+  const p2=qs("#signup-pass2").value;
+  if(!u||!p||p!==p2||u.length<3||p.length<6){setStatus("invalid signup");return}
+  setStatus("");
+  const salt=randomSalt();
+  const hash=await hashPass(p,salt);
+  const resp=await apiPost("signup",{username:u,salt,hash});
+  if(!resp||!resp.token){setStatus("signup failed");return}
+  setToken(resp.token);
+  state.sessionUser=resp.user||u;
+  renderAuth();
+  await fetchPosts();
+}
+async function login(){
+  const u=qs("#login-user").value.trim();
+  const p=qs("#login-pass").value;
+  if(!u||!p){setStatus("invalid login");return}
+  setStatus("");
+  const saltResp=await apiGet("user_salt",{username:u});
+  if(!saltResp||!saltResp.salt){setStatus("user not found");return}
+  const hash=await hashPass(p,saltResp.salt);
+  const resp=await apiPost("login",{username:u,hash});
+  if(!resp||!resp.token){setStatus("login failed");return}
+  setToken(resp.token);
+  state.sessionUser=resp.user||u;
+  renderAuth();
+  await fetchPosts();
+}
+function logout(){
+  setToken("");
+  state.sessionUser=null;
+  renderAuth();
+  renderPosts();
+}
+async function adminLogin(){
+  const u=qs("#admin-user").value.trim();
+  const p=qs("#admin-pass").value;
+  if(!u||!p){setStatus("admin username and password required");return}
+  setStatus("");
+  const ok=await apiPost("admin_check",{},p,u);
+  if(!ok||!ok.ok){setStatus("admin login failed");return}
+  setAdminPass(p);
+  setAdminUser(u);
+  state.adminOk=true;
+  renderAuth();
+  renderPosts();
+}
+function adminLogout(){
+  setAdminPass("");
+  setAdminUser("");
+  state.adminOk=false;
+  renderAuth();
+  renderPosts();
+}
+async function postFromFile(file,type,title){
+  if(file.size>200*1024){setStatus("file too big, use a URL");return}
+  const r=new FileReader();
+  r.onload=async()=>{
+    const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result});
+    if(!resp){setStatus("post failed");return}
+    qs("#post-file").value="";
+    qs("#post-url").value="";
+    qs("#post-title").value="";
+    await fetchPosts();
+  };
+  r.readAsDataURL(file);
+}
+async function postFromUrl(url,type,title){
+  const resp=await apiPost("create_post",{token:state.token,title,type,url});
+  if(!resp){setStatus("post failed");return}
+  qs("#post-url").value="";
+  qs("#post-title").value="";
+  await fetchPosts();
+}
+function postCreate(){
+  const title=qs("#post-title").value.trim();
+  const type=qs("#post-type").value;
+  const url=qs("#post-url").value.trim();
+  const file=qs("#post-file").files[0];
+  setStatus("");
+  if(file){postFromFile(file,type,title);return}
+  if(url){postFromUrl(url,type,title);return}
+  setStatus("add a file or url");
+}
+async function fetchPosts(){
+  const data=await apiGet("posts");
+  state.posts=Array.isArray(data?.posts)?data.posts:[];
+  renderPosts();
+}
+async function refreshSession(){
+  if(!state.token){state.sessionUser=null;renderAuth();return}
+  const data=await apiPost("session",{token:state.token});
+  if(!data||!data.user){setToken("");state.sessionUser=null}else{state.sessionUser=data.user}
+  renderAuth();
+}
+async function refreshAdmin(){
+  if(!state.adminPass||!state.adminUser){state.adminOk=false;renderAuth();return}
+  const data=await apiPost("admin_check",{},state.adminPass,state.adminUser);
+  state.adminOk=!!data?.ok;
+  renderAuth();
+}
+function wire(){
+  qs("#signup-btn").onclick=signup;
+  qs("#login-btn").onclick=login;
+  qs("#logout-btn").onclick=logout;
+  qs("#admin-login-btn").onclick=adminLogin;
+  qs("#admin-logout-btn").onclick=adminLogout;
+  qs("#post-btn").onclick=postCreate;
+}
+loadState();
+wire();
+refreshSession().then(fetchPosts);
+refreshAdmin();
+const hc=qs("#header-container");
+hc&&fetch("/global/header.html").then(e=>e.text()).then(e=>{hc.innerHTML=e});
+</script>
+</body></html>
