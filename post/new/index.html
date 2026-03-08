@@ -62,10 +62,16 @@ function loadState(){
 }
 async function refreshSession(){
   if(!state.token){qs("#post-locked").classList.remove("hidden");return}
-  const data=await apiPost("session",{token:state.token});
-  if(!data||!data.user){LS.removeItem(KEY);qs("#post-locked").classList.remove("hidden");return}
   qs("#post-locked").classList.add("hidden");
   qs("#post-form").classList.remove("hidden");
+  const data=await apiPost("session",{token:state.token});
+  if(!data||!data.user){
+    LS.removeItem(KEY);
+    qs("#post-form").classList.add("hidden");
+    qs("#post-locked").classList.remove("hidden");
+    setStatus("session expired");
+    return;
+  }
 }
 async function postFromFile(file,type,title){
   if(file.size>30*1024*1024){setStatus("file too big, use a URL");return}
