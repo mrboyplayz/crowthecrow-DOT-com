@@ -10,10 +10,40 @@ export default async function handler(req, res) {
   const token = process.env.KV_REST_API_TOKEN;
   const adminPass = process.env.CAW_ADMIN_PASSWORD || "";
   const adminUser = process.env.CAW_ADMIN_USERNAME || "";
-  const discordClientId = process.env.DISCORD_CLIENT_ID || "";
-  const discordClientSecret = process.env.DISCORD_CLIENT_SECRET || "";
-  const discordRedirectUrl = process.env.DISCORD_REDIRECT_URL || "";
   const encoder = new TextEncoder();
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+  function baseUrlFromReq(req) {
+    const proto = String(req.headers["x-forwarded-proto"] || "https");
+    const host = String(req.headers.host || "");
+    if (!host) return "";
+    return `${proto}://${host}`;
+  }
+  function parseDataUrl(value) {
+    const match = /^data:([^;,]+)?(;base64)?,(.*)$/i.exec(String(value || ""));
+    if (!match) return null;
+    const mime = match[1] || "application/octet-stream";
+    const isBase64 = !!match[2];
+    const data = match[3] || "";
+    const buffer = isBase64 ? Buffer.from(data, "base64") : Buffer.from(decodeURIComponent(data), "utf8");
+    return { mime, buffer };
+  }
+  function guessMime(url) {
+    const lower = String(url || "").toLowerCase();
+    if (lower.endsWith(".mp4")) return "video/mp4";
+    if (lower.endsWith(".webm")) return "video/webm";
+    if (lower.endsWith(".ogg")) return "video/ogg";
+    if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+    if (lower.endsWith(".png")) return "image/png";
+    if (lower.endsWith(".gif")) return "image/gif";
+    return "";
+  }
   if (!url || !token) {
     res.status(500).json({ error: "missing_kv_config" });
     return;
@@ -121,10 +151,9 @@ export default async function handler(req, res) {
     const next = {};
     for (const [key, value] of Object.entries(sessions)) {
       if (value && typeof value === "object" && typeof value.user === "string") {
-        const discordState = typeof value.discordState === "string" ? value.discordState : "";
-        next[key] = { user: value.user, admin: !!value.admin, discordState };
+        next[key] = { user: value.user, admin: !!value.admin };
       } else if (typeof value === "string") {
-        next[key] = { user: value, admin: false, discordState: "" };
+        next[key] = { user: value, admin: false };
       }
     }
     return next;
@@ -132,10 +161,6 @@ export default async function handler(req, res) {
   async function loadSessions() {
     const sessions = (await kvGet(SESSIONS_KEY, {})) || {};
     return normalizeSessions(sessions);
-  }
-  async function loadUsers() {
-    const users = (await kvGet(USERS_KEY, {})) || {};
-    return users && typeof users === "object" && !Array.isArray(users) ? users : {};
   }
   try {
     if (req.method === "GET" && action === "posts") {
@@ -158,6 +183,63 @@ export default async function handler(req, res) {
       res.status(200).json({ post });
       return;
     }
+    if (req.method === "GET" && action === "embed") {
+      const id = String(u.searchParams.get("id") || "");
+      if (!id) {
+        res.status(400).setHeader("Content-Type", "text/html").end("bad request");
+        return;
+      }
+      const posts = (await kvGet(POSTS_KEY, [])) || [];
+      const post = Array.isArray(posts) ? posts.find(p => String(p.id) === id) : null;
+      if (!post) {
+        res.status(404).setHeader("Content-Type", "text/html").end("not found");
+        return;
+      }
+      const baseUrl = baseUrlFromReq(req);
+      const isData = String(post.url || "").startsWith("data:");
+      const mediaUrl = isData ? `${baseUrl}/api/caw-board?action=media&id=${encodeURIComponent(post.id)}` : String(post.url || "");
+      const postUrl = `${baseUrl}/post/?id=${encodeURIComponent(post.id)}`;
+      const title = escapeHtml(post.title || "post");
+      const desc = escapeHtml(`by ${post.user || "anon"}`);
+      const ogType = post.type === "video" ? "video.other" : "article";
+      const mime = isData ? parseDataUrl(post.url || "")?.mime || "" : guessMime(post.url || "");
+      const videoTags = post.type === "video"
+        ? `<meta property="og:video" content="${escapeHtml(mediaUrl)}"><meta property="og:video:type" content="${escapeHtml(mime || "video/mp4")}">`
+        : "";
+      const imageTag = `<meta property="og:image" content="${escapeHtml(mediaUrl)}">`;
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><meta property="og:title" content="${title}"><meta property="og:description" content="${desc}"><meta property="og:type" content="${ogType}"><meta property="og:url" content="${escapeHtml(postUrl)}">${imageTag}${videoTags}<meta name="twitter:card" content="summary_large_image"></head><body><a href="${escapeHtml(postUrl)}">View post</a></body></html>`;
+      res.status(200).setHeader("Content-Type", "text/html; charset=utf-8");
+      res.end(html);
+      return;
+    }
+    if (req.method === "GET" && action === "media") {
+      const id = String(u.searchParams.get("id") || "");
+      if (!id) {
+        res.status(400).end();
+        return;
+      }
+      const posts = (await kvGet(POSTS_KEY, [])) || [];
+      const post = Array.isArray(posts) ? posts.find(p => String(p.id) === id) : null;
+      if (!post) {
+        res.status(404).end();
+        return;
+      }
+      const urlField = String(post.url || "");
+      if (!urlField.startsWith("data:")) {
+        res.status(302).setHeader("Location", urlField).end();
+        return;
+      }
+      const parsed = parseDataUrl(urlField);
+      if (!parsed) {
+        res.status(400).end();
+        return;
+      }
+      res.status(200);
+      res.setHeader("Content-Type", parsed.mime);
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.end(parsed.buffer);
+      return;
+    }
     if (req.method === "GET" && action === "user_salt") {
       const username = cleanUser(u.searchParams.get("username") || "");
       if (!username) {
@@ -171,124 +253,6 @@ export default async function handler(req, res) {
         return;
       }
       res.status(200).json({ salt: user.salt || "" });
-      return;
-    }
-    if (req.method === "GET" && action === "discord_start") {
-      const tokenValue = String(u.searchParams.get("token") || "");
-      if (!tokenValue) {
-        res.status(400).json({ error: "bad_request" });
-        return;
-      }
-      if (!discordClientId || !discordClientSecret || !discordRedirectUrl) {
-        res.status(500).json({ error: "missing_discord_config" });
-        return;
-      }
-      const sessions = await loadSessions();
-      const session = sessions[tokenValue];
-      if (!session || !session.user) {
-        res.status(401).json({ error: "unauthorized" });
-        return;
-      }
-      const state = makeId();
-      sessions[tokenValue] = { user: session.user, admin: !!session.admin, discordState: state };
-      const ok = await kvSet(SESSIONS_KEY, sessions);
-      if (!ok) {
-        res.status(500).json({ error: "kv_set_failed" });
-        return;
-      }
-      const authorizeUrl = new URL("https://discord.com/api/oauth2/authorize");
-      authorizeUrl.searchParams.set("client_id", discordClientId);
-      authorizeUrl.searchParams.set("redirect_uri", discordRedirectUrl);
-      authorizeUrl.searchParams.set("response_type", "code");
-      authorizeUrl.searchParams.set("scope", "identify");
-      authorizeUrl.searchParams.set("state", state);
-      authorizeUrl.searchParams.set("prompt", "consent");
-      res.status(302).setHeader("Location", authorizeUrl.toString());
-      res.end();
-      return;
-    }
-    if (req.method === "GET" && action === "discord_callback") {
-      const code = String(u.searchParams.get("code") || "");
-      const state = String(u.searchParams.get("state") || "");
-      if (!code || !state) {
-        res.status(400).json({ error: "bad_request" });
-        return;
-      }
-      if (!discordClientId || !discordClientSecret || !discordRedirectUrl) {
-        res.status(500).json({ error: "missing_discord_config" });
-        return;
-      }
-      const sessions = await loadSessions();
-      let sessionToken = "";
-      let session = null;
-      for (const [key, value] of Object.entries(sessions)) {
-        if (value && value.discordState === state) {
-          sessionToken = key;
-          session = value;
-          break;
-        }
-      }
-      if (!session || !session.user) {
-        res.status(400).json({ error: "invalid_state" });
-        return;
-      }
-      const tokenResp = await fetch("https://discord.com/api/oauth2/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: discordClientId,
-          client_secret: discordClientSecret,
-          grant_type: "authorization_code",
-          code,
-          redirect_uri: discordRedirectUrl
-        })
-      });
-      if (!tokenResp.ok) {
-        res.status(502).json({ error: "token_exchange_failed" });
-        return;
-      }
-      const tokenData = await tokenResp.json();
-      const accessToken = String(tokenData?.access_token || "");
-      if (!accessToken) {
-        res.status(502).json({ error: "token_missing" });
-        return;
-      }
-      const userResp = await fetch("https://discord.com/api/users/@me", {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (!userResp.ok) {
-        res.status(502).json({ error: "discord_profile_failed" });
-        return;
-      }
-      const profile = await userResp.json();
-      const discordId = String(profile?.id || "");
-      if (!discordId) {
-        res.status(502).json({ error: "discord_profile_invalid" });
-        return;
-      }
-      const users = await loadUsers();
-      const userInfo = users[session.user];
-      if (!userInfo) {
-        res.status(404).json({ error: "user_not_found" });
-        return;
-      }
-      users[session.user] = {
-        ...userInfo,
-        discordId,
-        discordUsername: String(profile?.username || ""),
-        discordDiscriminator: String(profile?.discriminator || ""),
-        discordGlobalName: String(profile?.global_name || ""),
-        verifiedAt: now()
-      };
-      const okUsers = await kvSet(USERS_KEY, users);
-      if (!okUsers) {
-        res.status(500).json({ error: "kv_set_failed" });
-        return;
-      }
-      sessions[sessionToken] = { user: session.user, admin: !!session.admin, discordState: "" };
-      await kvSet(SESSIONS_KEY, sessions);
-      res.status(302).setHeader("Location", "/caw-board/?verified=1");
-      res.end();
       return;
     }
     const body = await readBody();
@@ -369,11 +333,7 @@ export default async function handler(req, res) {
         res.status(404).json({ error: "not_found" });
         return;
       }
-      const users = await loadUsers();
-      const userInfo = users[session.user] || {};
-      const verified = !!userInfo.discordId;
-      const discordName = String(userInfo.discordGlobalName || userInfo.discordUsername || "");
-      res.status(200).json({ ok: true, user: session.user, admin: !!session.admin, verified, discordName });
+      res.status(200).json({ ok: true, user: session.user, admin: !!session.admin });
       return;
     }
     if (req.method === "POST" && action === "create_post") {
@@ -392,12 +352,6 @@ export default async function handler(req, res) {
       const session = sessions[tokenValue];
       if (!session || !session.user) {
         res.status(401).json({ error: "unauthorized" });
-        return;
-      }
-      const users = await loadUsers();
-      const userInfo = users[session.user] || {};
-      if (!session.admin && !userInfo.discordId) {
-        res.status(403).json({ error: "discord_required" });
         return;
       }
       if (urlField.startsWith("data:")) {
@@ -442,12 +396,6 @@ export default async function handler(req, res) {
       const session = sessions[tokenValue];
       if (!session || !session.user) {
         res.status(401).json({ error: "unauthorized" });
-        return;
-      }
-      const users = await loadUsers();
-      const userInfo = users[session.user] || {};
-      if (!session.admin && !userInfo.discordId) {
-        res.status(403).json({ error: "discord_required" });
         return;
       }
       const posts = (await kvGet(POSTS_KEY, [])) || [];
@@ -561,10 +509,7 @@ export default async function handler(req, res) {
       const users = (await kvGet(USERS_KEY, {})) || {};
       const list = Object.entries(users).map(([user, info]) => ({
         user,
-        created: Number(info?.created || 0),
-        verified: !!info?.discordId,
-        discordId: String(info?.discordId || ""),
-        discordName: String(info?.discordGlobalName || info?.discordUsername || "")
+        created: Number(info?.created || 0)
       }));
       list.sort((a, b) => b.created - a.created);
       res.status(200).json({ ok: true, users: list });
@@ -583,28 +528,34 @@ export default async function handler(req, res) {
         res.status(401).json({ error: "unauthorized" });
         return;
       }
+      if (session.user && session.user === username) {
+        res.status(400).json({ error: "cannot_delete_self" });
+        return;
+      }
       const users = (await kvGet(USERS_KEY, {})) || {};
       if (!users[username]) {
         res.status(404).json({ error: "not_found" });
         return;
       }
       delete users[username];
+      const nextSessions = {};
+      for (const [key, value] of Object.entries(sessions)) {
+        if (value && typeof value === "object" && value.user === username) continue;
+        nextSessions[key] = value;
+      }
+      let posts = (await kvGet(POSTS_KEY, [])) || [];
+      posts = Array.isArray(posts) ? posts.filter(p => p.user !== username) : [];
+      posts.forEach(p => {
+        if (!Array.isArray(p.comments)) return;
+        p.comments = p.comments.filter(c => c.user !== username);
+      });
       const okUsers = await kvSet(USERS_KEY, users);
-      if (!okUsers) {
+      const okSessions = await kvSet(SESSIONS_KEY, nextSessions);
+      const okPosts = await kvSet(POSTS_KEY, posts);
+      if (!okUsers || !okSessions || !okPosts) {
         res.status(500).json({ error: "kv_set_failed" });
         return;
       }
-      const nextSessions = await loadSessions();
-      for (const [key, value] of Object.entries(nextSessions)) {
-        if (value && value.user === username) delete nextSessions[key];
-      }
-      await kvSet(SESSIONS_KEY, nextSessions);
-      let posts = (await kvGet(POSTS_KEY, [])) || [];
-      posts = Array.isArray(posts) ? posts.filter(p => p.user !== username).map(p => ({
-        ...p,
-        comments: Array.isArray(p.comments) ? p.comments.filter(c => c.user !== username) : []
-      })) : [];
-      await kvSet(POSTS_KEY, posts);
       res.status(200).json({ ok: true });
       return;
     }

@@ -61,15 +61,28 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 <script>
 const qs=e=>document.querySelector(e);
 const LS=localStorage;
-const apiUrl="/api/caw-board";
+const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
+const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
+const embedBase=apiBase||location.origin;
 const KEYS={token:"caw_session_token"};
-const state={token:"",sessionUser:null,isAdmin:false,isVerified:false,post:null,posts:[]};
+const state={token:"",sessionUser:null,isAdmin:false,post:null,posts:[]};
 const pathParts=location.pathname.split("/").filter(Boolean);
 const queryId=new URLSearchParams(location.search).get("id")||"";
 const hashId=(location.hash||"").replace(/^#/,"");
 const postId=queryId||(pathParts[0]==="post"&&pathParts[1]?decodeURIComponent(pathParts[1]):"")||hashId;
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
+function buildEmbedUrl(id){
+  return `${embedBase}/api/caw-board?action=embed&id=${encodeURIComponent(id)}`;
+}
+async function copyText(value){
+  try{
+    await navigator.clipboard.writeText(value);
+    return true;
+  }catch{
+    return false;
+  }
+}
 async function apiGet(action,params){
   const url=new URL(apiUrl,location.origin);
   url.searchParams.set("action",action);
@@ -86,12 +99,6 @@ async function apiPost(action,body){
   if(!resp.ok)return null;
   return resp.json();
 }
-function discordStartUrl(){
-  const url=new URL(apiUrl,location.origin);
-  url.searchParams.set("action","discord_start");
-  url.searchParams.set("token",state.token);
-  return url.toString();
-}
 function loadState(){
   state.token=LS.getItem(KEYS.token)||"";
 }
@@ -105,103 +112,10 @@ function renderAuth(){
   qs("#auth-logged-in").classList.toggle("hidden",!loggedIn);
   qs("#session-user").textContent=state.sessionUser?`${state.sessionUser}${state.isAdmin?" (admin)":""}`:"";
 }
-function extFromUrl(url){
-  try{
-    const parsed=new URL(url);
-    const parts=parsed.pathname.split("/").filter(Boolean);
-    const last=parts.length?parts[parts.length-1]:"";
-    const dot=last.lastIndexOf(".");
-    return dot>-1?last.slice(dot+1).toLowerCase():"";
-  }catch{
-    return "";
-  }
-}
-function embedFromUrl(url){
-  try{
-    const parsed=new URL(url);
-    const host=parsed.hostname.replace(/^www\./,"").toLowerCase();
-    if(host==="youtu.be"){
-      const id=parsed.pathname.split("/").filter(Boolean)[0];
-      if(id)return `https://www.youtube-nocookie.com/embed/${id}`;
-    }
-    if(host==="youtube.com"){
-      if(parsed.pathname==="/watch"){
-        const id=parsed.searchParams.get("v");
-        if(id)return `https://www.youtube-nocookie.com/embed/${id}`;
-      }
-      if(parsed.pathname.startsWith("/shorts/")){
-        const id=parsed.pathname.split("/").filter(Boolean)[1];
-        if(id)return `https://www.youtube-nocookie.com/embed/${id}`;
-      }
-      if(parsed.pathname.startsWith("/embed/")){
-        return url;
-      }
-    }
-    if(host==="vimeo.com"){
-      const id=parsed.pathname.split("/").filter(Boolean)[0];
-      if(id)return `https://player.vimeo.com/video/${id}`;
-    }
-  }catch{}
-  return "";
-}
-function buildMedia(url,type){
-  if(!url)return null;
-  if(url.startsWith("data:")){
-    return {kind:type==="video"?"video":"img",src:url};
-  }
-  const ext=extFromUrl(url);
-  if(["jpg","jpeg","png","gif","webp","avif","bmp","svg"].includes(ext)){
-    return {kind:"img",src:url};
-  }
-  if(["mp4","webm","ogg","mov","m4v"].includes(ext)){
-    return {kind:"video",src:url};
-  }
-  const embed=embedFromUrl(url);
-  if(embed){
-    return {kind:"iframe",src:embed};
-  }
-  return {kind:type==="video"?"video":"img",src:url,fallback:true};
-}
-function renderMedia(body,post){
-  const spec=buildMedia(post.url,post.type);
-  if(!spec)return;
-  if(spec.kind==="iframe"){
-    const frame=document.createElement("iframe");
-    frame.src=spec.src;
-    frame.className="post-media";
-    frame.setAttribute("allow","accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
-    frame.setAttribute("allowfullscreen","true");
-    body.appendChild(frame);
-    return;
-  }
-  const media=document.createElement(spec.kind==="video"?"video":"img");
-  media.className="post-media";
-  media.src=spec.src;
-  if(spec.kind==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
-  body.appendChild(media);
-  if(spec.fallback){
-    const link=document.createElement("a");
-    link.className="post-link";
-    link.href=post.url;
-    link.target="_blank";
-    link.rel="noreferrer";
-    link.textContent="Open link";
-    body.appendChild(link);
-  }
-}
 async function refreshSession(){
   if(!state.token){state.sessionUser=null;renderAuth();return}
   const data=await apiPost("session",{token:state.token});
-  if(!data||!data.user){
-    setToken("");
-    state.sessionUser=null;
-    state.isAdmin=false;
-    state.isVerified=false;
-  }else{
-    state.sessionUser=data.user;
-    state.isAdmin=!!data.admin;
-    state.isVerified=!!data.verified||state.isAdmin;
-  }
+  if(!data||!data.user){setToken("");state.sessionUser=null;state.isAdmin=false}else{state.sessionUser=data.user;state.isAdmin=!!data.admin}
   renderAuth();
 }
 function renderPost(){
@@ -221,7 +135,11 @@ function renderPost(){
   head.innerHTML=`<div class="post-title">${safeTitle}</div><div class="post-meta">by ${post.user} • ${fmtTime(post.ts)}</div>`;
   const body=document.createElement("div");
   body.className="post-body";
-  renderMedia(body,post);
+  const media=document.createElement(post.type==="video"?"video":"img");
+  media.className="post-media";
+  media.src=post.url;
+  if(post.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
+  body.appendChild(media);
   let actions=null;
   const ensureActions=()=>{
     if(actions)return actions;
@@ -254,6 +172,16 @@ function renderPost(){
     };
     ensureActions().appendChild(del);
   }
+  const embed=document.createElement("button");
+  embed.className="btn";
+  embed.textContent="Copy Embed Link";
+  embed.onclick=async()=>{
+    const url=buildEmbedUrl(post.id);
+    const ok=await copyText(url);
+    if(!ok){prompt("Embed link",url);return}
+    setStatus("embed link copied");
+  };
+  ensureActions().appendChild(embed);
   const cwrap=document.createElement("div");
   const comments=Array.isArray(post.comments)?post.comments:[];
   comments.forEach(c=>{
@@ -275,7 +203,7 @@ function renderPost(){
     }
     cwrap.appendChild(cdiv);
   });
-  if(state.sessionUser&&state.isVerified){
+  if(state.sessionUser){
     const form=document.createElement("div");
     form.className="comment";
     const inp=document.createElement("input");
@@ -293,20 +221,6 @@ function renderPost(){
       await fetchPost(post.id);
     };
     form.append(inp,btn);
-    cwrap.appendChild(form);
-  }else if(state.sessionUser){
-    const form=document.createElement("div");
-    form.className="comment";
-    const msg=document.createElement("div");
-    msg.className="muted";
-    msg.textContent="Verify Discord to comment.";
-    const btn=document.createElement("button");
-    btn.className="btn";
-    btn.textContent="Verify Discord";
-    btn.onclick=()=>{
-      location.href=discordStartUrl();
-    };
-    form.append(msg,btn);
     cwrap.appendChild(form);
   }
   body.appendChild(cwrap);
@@ -327,7 +241,11 @@ function renderList(){
     head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/?id=${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
     const body=document.createElement("div");
     body.className="post-body";
-    renderMedia(body,p);
+    const media=document.createElement(p.type==="video"?"video":"img");
+    media.className="post-media";
+    media.src=p.url;
+    if(p.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
+    body.appendChild(media);
     wrap.append(head,body);
     list.appendChild(wrap);
   });

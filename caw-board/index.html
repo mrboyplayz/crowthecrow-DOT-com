@@ -35,6 +35,8 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .comment-text{font-size:12px;color:#e8e8e8}
 .admin-tag{color:#ffcc66;font-weight:700}
 .users-list{max-height:220px;overflow:auto;white-space:pre-wrap}
+.user-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.user-name{flex:1}
 .hidden{display:none}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
 .topbar-links{display:flex;gap:8px;flex-wrap:wrap}
@@ -58,12 +60,6 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
         <div class="panel">
           <h3>Rules</h3>
           <div class="muted">no Porn buddy this is a meme image board send bullshit idk just dont make it porn looking at you GREG.</div>
-        </div>
-        <div id="verify-panel" class="panel hidden">
-          <h3>Discord Verification</h3>
-          <div class="muted">Verify to post and comment.</div>
-          <button id="verify-btn" class="btn" style="margin-top:6px">Verify Discord</button>
-          <div id="verify-status" class="muted" style="margin-top:6px"></div>
         </div>
         <div id="admin-panel" class="panel hidden">
           <h3>Admin</h3>
@@ -90,9 +86,10 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 <script>
 const qs=e=>document.querySelector(e);
 const LS=localStorage;
-const apiUrl="/api/caw-board";
+const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
+const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEYS={token:"caw_session_token"};
-const state={posts:[],users:[],sessionUser:null,token:"",isAdmin:false,isVerified:false,discordName:""};
+const state={posts:[],users:[],sessionUser:null,token:"",isAdmin:false};
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 async function apiGet(action,params){
@@ -111,12 +108,6 @@ async function apiPost(action,body){
   if(!resp.ok)return null;
   return resp.json();
 }
-function discordStartUrl(){
-  const url=new URL(apiUrl,location.origin);
-  url.searchParams.set("action","discord_start");
-  url.searchParams.set("token",state.token);
-  return url.toString();
-}
 function loadState(){
   state.token=LS.getItem(KEYS.token)||"";
 }
@@ -130,141 +121,47 @@ function renderAuth(){
   qs("#auth-logged-out").classList.toggle("hidden",loggedIn);
   qs("#auth-logged-in").classList.toggle("hidden",!loggedIn);
   qs("#session-user").textContent=state.sessionUser?`${state.sessionUser}${state.isAdmin?" (admin)":""}`:"";
-  qs("#post-locked").classList.toggle("hidden",loggedIn&&state.isVerified);
-  qs("#post-link").classList.toggle("hidden",!loggedIn||!state.isVerified);
-  if(loggedIn&&!state.isVerified){
-    qs("#post-locked").textContent="Verify Discord to post.";
-  }else{
-    qs("#post-locked").textContent="Sign in to post.";
-  }
+  qs("#post-locked").classList.toggle("hidden",loggedIn);
+  qs("#post-link").classList.toggle("hidden",!loggedIn);
   qs("#admin-panel").classList.toggle("hidden",!state.isAdmin);
   if(!state.isAdmin){
     state.users=[];
     renderUsers();
   }
-  renderVerify();
-}
-function renderVerify(){
-  const show=!!state.sessionUser&&!state.isVerified;
-  qs("#verify-panel").classList.toggle("hidden",!show);
-  if(show){
-    const label=state.discordName?`Connected: ${state.discordName}`:"Not verified";
-    qs("#verify-status").textContent=label;
-  }else{
-    qs("#verify-status").textContent="";
-  }
 }
 function renderUsers(){
   const listEl=qs("#users-list");
   if(!listEl)return;
-  if(!state.isAdmin||!state.users.length){listEl.textContent="";return}
   listEl.innerHTML="";
+  if(!state.isAdmin||!state.users.length)return;
   state.users.forEach(u=>{
     const row=document.createElement("div");
+    row.className="user-row";
+    const name=document.createElement("div");
+    name.className="user-name";
     const created=u.created?` • ${fmtTime(u.created)}`:"";
-    const verified=u.verified?" • verified":" • unverified";
-    const discord=u.discordId?` • ${u.discordId}`:"";
-    const label=document.createElement("div");
-    label.textContent=`${u.user}${created}${verified}${discord}`;
-    const terminate=document.createElement("button");
-    terminate.className="btn";
-    terminate.textContent="Terminate";
-    terminate.onclick=async()=>{
+    name.textContent=`${u.user}${created}`;
+    const btn=document.createElement("button");
+    btn.className="btn";
+    btn.textContent="Terminate";
+    if(u.user===state.sessionUser){
+      btn.disabled=true;
+      btn.textContent="Current";
+    }
+    btn.onclick=async()=>{
+      if(btn.disabled)return;
       if(!confirm(`Terminate ${u.user}?`))return;
       setStatus("");
-      const ok=await apiPost("admin_delete_user",{token:state.token,username:u.user});
-      if(!ok){setStatus("terminate failed");return}
-      state.users=state.users.filter(x=>x.user!==u.user);
+      const resp=await apiPost("admin_delete_user",{token:state.token,username:u.user});
+      if(!resp||!resp.ok){setStatus("terminate failed");return}
+      state.users=state.users.filter(item=>item.user!==u.user);
       renderUsers();
+      await fetchPosts();
       setStatus(`terminated ${u.user}`);
     };
-    row.append(label,terminate);
+    row.append(name,btn);
     listEl.appendChild(row);
   });
-}
-function extFromUrl(url){
-  try{
-    const parsed=new URL(url);
-    const parts=parsed.pathname.split("/").filter(Boolean);
-    const last=parts.length?parts[parts.length-1]:"";
-    const dot=last.lastIndexOf(".");
-    return dot>-1?last.slice(dot+1).toLowerCase():"";
-  }catch{
-    return "";
-  }
-}
-function embedFromUrl(url){
-  try{
-    const parsed=new URL(url);
-    const host=parsed.hostname.replace(/^www\./,"").toLowerCase();
-    if(host==="youtu.be"){
-      const id=parsed.pathname.split("/").filter(Boolean)[0];
-      if(id)return `https://www.youtube-nocookie.com/embed/${id}`;
-    }
-    if(host==="youtube.com"){
-      if(parsed.pathname==="/watch"){
-        const id=parsed.searchParams.get("v");
-        if(id)return `https://www.youtube-nocookie.com/embed/${id}`;
-      }
-      if(parsed.pathname.startsWith("/shorts/")){
-        const id=parsed.pathname.split("/").filter(Boolean)[1];
-        if(id)return `https://www.youtube-nocookie.com/embed/${id}`;
-      }
-      if(parsed.pathname.startsWith("/embed/")){
-        return url;
-      }
-    }
-    if(host==="vimeo.com"){
-      const id=parsed.pathname.split("/").filter(Boolean)[0];
-      if(id)return `https://player.vimeo.com/video/${id}`;
-    }
-  }catch{}
-  return "";
-}
-function buildMedia(url,type){
-  if(!url)return null;
-  if(url.startsWith("data:")){
-    return {kind:type==="video"?"video":"img",src:url};
-  }
-  const ext=extFromUrl(url);
-  if(["jpg","jpeg","png","gif","webp","avif","bmp","svg"].includes(ext)){
-    return {kind:"img",src:url};
-  }
-  if(["mp4","webm","ogg","mov","m4v"].includes(ext)){
-    return {kind:"video",src:url};
-  }
-  const embed=embedFromUrl(url);
-  if(embed){
-    return {kind:"iframe",src:embed};
-  }
-  return {kind:type==="video"?"video":"img",src:url,fallback:true};
-}
-function renderMedia(body,post){
-  const spec=buildMedia(post.url,post.type);
-  if(!spec)return;
-  if(spec.kind==="iframe"){
-    const frame=document.createElement("iframe");
-    frame.src=spec.src;
-    frame.className="post-media";
-    frame.setAttribute("allow","accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
-    frame.setAttribute("allowfullscreen","true");
-    body.appendChild(frame);
-    return;
-  }
-  const media=document.createElement(spec.kind==="video"?"video":"img");
-  media.className="post-media";
-  media.src=spec.src;
-  if(spec.kind==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
-  body.appendChild(media);
-  if(spec.fallback){
-    const link=document.createElement("a");
-    link.className="post-link";
-    link.href=post.url;
-    link.target="_blank";
-    link.rel="noreferrer";
-    link.textContent="Open link";
-    body.appendChild(link);
-  }
 }
 function renderPosts(){
   const postsEl=qs("#posts");
@@ -279,7 +176,11 @@ function renderPosts(){
     head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/?id=${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
     const body=document.createElement("div");
     body.className="post-body";
-    renderMedia(body,p);
+    const media=document.createElement(p.type==="video"?"video":"img");
+    media.className="post-media";
+    media.src=p.url;
+    if(p.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
+    body.appendChild(media);
     let actions=null;
     const ensureActions=()=>{
       if(actions)return actions;
@@ -348,28 +249,13 @@ async function fetchPosts(){
 async function refreshSession(){
   if(!state.token){state.sessionUser=null;renderAuth();return}
   const data=await apiPost("session",{token:state.token});
-  if(!data||!data.user){
-    setToken("");
-    state.sessionUser=null;
-    state.isAdmin=false;
-    state.isVerified=false;
-    state.discordName="";
-  }else{
-    state.sessionUser=data.user;
-    state.isAdmin=!!data.admin;
-    state.isVerified=!!data.verified||state.isAdmin;
-    state.discordName=data.discordName||"";
-  }
+  if(!data||!data.user){setToken("");state.sessionUser=null;state.isAdmin=false}else{state.sessionUser=data.user;state.isAdmin=!!data.admin}
   renderAuth();
 }
 function wire(){
   qs("#logout-btn").onclick=logout;
   qs("#wipe-btn").onclick=adminWipe;
   qs("#load-users-btn").onclick=adminLoadUsers;
-  qs("#verify-btn").onclick=()=>{
-    if(!state.token)return;
-    location.href=discordStartUrl();
-  };
 }
 loadState();
 wire();
