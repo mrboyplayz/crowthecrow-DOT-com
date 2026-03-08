@@ -126,7 +126,7 @@ function renderPost(){
   const media=document.createElement(post.type==="video"?"video":"img");
   media.className="post-media";
   media.src=post.url;
-  if(post.type==="video"){media.controls=true}
+  if(post.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
   body.appendChild(media);
   let actions=null;
   const ensureActions=()=>{
@@ -222,7 +222,7 @@ function renderList(){
     const media=document.createElement(p.type==="video"?"video":"img");
     media.className="post-media";
     media.src=p.url;
-    if(p.type==="video"){media.controls=true}
+    if(p.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
     body.appendChild(media);
     wrap.append(head,body);
     list.appendChild(wrap);
