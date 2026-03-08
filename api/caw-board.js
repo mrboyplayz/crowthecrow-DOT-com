@@ -10,6 +10,8 @@ export default async function handler(req, res) {
   const token = process.env.KV_REST_API_TOKEN;
   const adminPass = process.env.CAW_ADMIN_PASSWORD || "";
   const adminUser = process.env.CAW_ADMIN_USERNAME || "";
+  const bunnyPull = process.env.BUNNY_STORAGE_PULL || process.env["BUNNY-STORAGE-PULL"] || "";
+  const bunnyUploadEndpoint = process.env.BUNNY_UPLOAD_ENDPOINT || process.env["BUNNY-UPLOAD-ENDPOINT"] || "";
   const encoder = new TextEncoder();
   if (!url || !token) {
     res.status(500).json({ error: "missing_kv_config" });
@@ -130,6 +132,13 @@ export default async function handler(req, res) {
     return normalizeSessions(sessions);
   }
   try {
+    if (req.method === "GET" && action === "bunny_config") {
+      res.status(200).json({
+        pull: bunnyPull,
+        uploadEndpoint: bunnyUploadEndpoint
+      });
+      return;
+    }
     if (req.method === "GET" && action === "posts") {
       const posts = (await kvGet(POSTS_KEY, [])) || [];
       res.status(200).json({ posts: Array.isArray(posts) ? posts.slice(0, 200) : [] });

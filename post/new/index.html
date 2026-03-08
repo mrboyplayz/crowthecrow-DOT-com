@@ -50,11 +50,6 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
           <option value="1200000">1200kbps</option>
         </select>
       </div>
-      <div class="hidden">
-        <input id="cloud-enabled" type="checkbox" checked>
-        <input id="cloud-name" class="input" placeholder="cloud name">
-        <input id="cloud-preset" class="input" placeholder="unsigned upload preset">
-      </div>
       <button id="post-btn" class="btn" style="margin-top:8px">Post</button>
     </div>
     <div id="status" class="muted" style="margin-top:6px"></div>
@@ -74,8 +69,7 @@ const KEY="caw_session_token";
 const state={token:""};
 const MAX_UPLOAD=30*1024*1024;
 const MAX_VERCEL_UPLOAD=4*1024*1024;
-const CLOUD_KEYS={enabled:"caw_cloud_enabled",name:"caw_cloud_name",preset:"caw_cloud_preset"};
-const CLOUD_DEFAULTS={name:"dicbdelt3",preset:"caw_upload"};
+const bunnyConfig={pull:"",uploadEndpoint:""};
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function showProgress(value){
   const el=qs("#upload-progress");
@@ -106,17 +100,50 @@ async function apiPost(action,body,timeoutMs=30000){
 }
 function loadState(){
   state.token=LS.getItem(KEY)||"";
-  const enabled=LS.getItem(CLOUD_KEYS.enabled);
-  if(enabled!=null)qs("#cloud-enabled").checked=enabled==="1";
-  const name=LS.getItem(CLOUD_KEYS.name)||CLOUD_DEFAULTS.name;
-  const preset=LS.getItem(CLOUD_KEYS.preset)||CLOUD_DEFAULTS.preset;
-  qs("#cloud-name").value=name;
-  qs("#cloud-preset").value=preset;
 }
-function saveCloud(){
-  LS.setItem(CLOUD_KEYS.enabled,qs("#cloud-enabled").checked?"1":"0");
-  LS.setItem(CLOUD_KEYS.name,qs("#cloud-name").value.trim());
-  LS.setItem(CLOUD_KEYS.preset,qs("#cloud-preset").value.trim());
+async function loadBunnyConfig(){
+  try{
+    const url=new URL(apiUrl,location.origin);
+    url.searchParams.set("action","bunny_config");
+    const resp=await fetch(url.toString(),{method:"GET"});
+    if(!resp.ok)return;
+    const data=await resp.json();
+    bunnyConfig.pull=String(data?.pull||"").trim();
+    bunnyConfig.uploadEndpoint=String(data?.uploadEndpoint||"").trim();
+  }catch{}
+}
+async function uploadToBunnyEndpoint(file){
+  if(!bunnyConfig.uploadEndpoint)return null;
+  return new Promise(resolve=>{
+    const endpoint=new URL(bunnyConfig.uploadEndpoint,location.origin);
+    endpoint.searchParams.set("filename",encodeURIComponent(file.name||"upload.bin"));
+    endpoint.searchParams.set("type",file.type||"application/octet-stream");
+    const xhr=new XMLHttpRequest();
+    xhr.open("POST",endpoint.toString(),true);
+    xhr.setRequestHeader("Content-Type",file.type||"application/octet-stream");
+    xhr.upload.onprogress=e=>{
+      if(e.lengthComputable){
+        const pct=Math.max(0,Math.min(100,Math.round((e.loaded/e.total)*100)));
+        showProgress(pct);
+      }else{
+        showProgress(null);
+      }
+    };
+    xhr.onload=()=>{
+      if(xhr.status<200||xhr.status>=300){return resolve(null)}
+      let data=null;
+      try{data=JSON.parse(xhr.responseText||"")}catch{data=null}
+      if(data?.url)return resolve(String(data.url));
+      if(data?.path&&bunnyConfig.pull){
+        const pull=bunnyConfig.pull.replace(/^https?:\/\//,"").replace(/\/+$/,"");
+        const path=String(data.path).replace(/^\/+/,"");
+        return resolve(`https://${pull}/${path}`);
+      }
+      return resolve(null);
+    };
+    xhr.onerror=()=>resolve(null);
+    xhr.send(file);
+  });
 }
 function supportsCompression(){
   return typeof MediaRecorder!=="undefined"&&typeof HTMLCanvasElement!=="undefined";
@@ -203,41 +230,37 @@ async function postFromFile(file,type,title){
     if(!blob){setStatus("compression failed");hideProgress();return}
     uploadFile=new File([blob],file.name.replace(/\.[^/.]+$/,"")+".webm",{type:blob.type||"video/webm"});
   }
-  const cloudUrl=await uploadToCloudinary(uploadFile,type);
-  if(!cloudUrl){setStatus("cloudinary upload failed");hideProgress();return}
-  await postFromUrl(cloudUrl,type,title);
-}
-async function uploadToCloudinary(file,type){
-  const enabled=qs("#cloud-enabled").checked;
-  const cloudName=(qs("#cloud-name").value||"").trim()||CLOUD_DEFAULTS.name;
-  const preset=(qs("#cloud-preset").value||"").trim()||CLOUD_DEFAULTS.preset;
-  qs("#cloud-name").value=cloudName;
-  qs("#cloud-preset").value=preset;
-  saveCloud();
-  if(!enabled||!cloudName||!preset){setStatus("missing cloudinary preset");return null}
-  setStatus("uploading to cloudinary...");
-  showProgress(null);
-  const endpoint=`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/${type==="video"?"video":"image"}/upload`;
-  const form=new FormData();
-  form.append("file",file);
-  form.append("upload_preset",preset);
-  form.append("folder","caw-board");
-  try{
-    const resp=await fetch(endpoint,{method:"POST",body:form});
-    if(!resp.ok){
-      let msg="cloudinary upload failed";
-      try{
-        const err=await resp.json();
-        msg=err?.error?.message||msg;
-      }catch{}
-      setStatus(msg);
-      return null;
-    }
-    const data=await resp.json();
-    return data.secure_url||data.url||null;
-  }catch{
-    return null;
+  if(bunnyConfig.uploadEndpoint){
+    setStatus("uploading to storage...");
+    showProgress(0);
+    const url=await uploadToBunnyEndpoint(uploadFile);
+    if(!url){setStatus("storage upload failed");hideProgress();return}
+    const resp=await apiPost("create_post",{token:state.token,title,type,url},45000);
+    const postId=resp?.post?.id||resp?.id||"";
+    if(!resp||!postId){setStatus("post save failed");hideProgress();return}
+    location.href=`/post/?id=${encodeURIComponent(postId)}`;
+    return;
   }
+  if(apiBase&&uploadFile.size>MAX_VERCEL_UPLOAD){setStatus("file too big for server upload, use a URL");return}
+  const r=new FileReader();
+  r.onloadstart=()=>{setStatus("reading file...");showProgress(0)};
+  r.onprogress=e=>{
+    if(e.lengthComputable){
+      const pct=Math.max(0,Math.min(100,Math.round((e.loaded/e.total)*100)));
+      showProgress(pct);
+    }
+  };
+  r.onload=async()=>{
+    setStatus("uploading...");
+    showProgress(null);
+    const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result},45000);
+    const postId=resp?.post?.id||resp?.id||"";
+    if(!resp||!postId){setStatus("upload failed or timed out");hideProgress();return}
+    location.href=`/post/?id=${encodeURIComponent(postId)}`;
+  };
+  r.onerror=()=>{setStatus("file read failed");hideProgress()};
+  r.onloadend=()=>{if(qs("#upload-progress"))showProgress(100)};
+  r.readAsDataURL(uploadFile);
 }
 async function postFromUrl(url,type,title){
   const resp=await apiPost("create_post",{token:state.token,title,type,url});
@@ -276,6 +299,6 @@ function postCreate(){
 }
 qs("#post-btn").onclick=postCreate;
 loadState();
-refreshSession();
+loadBunnyConfig().finally(refreshSession);
 </script>
 </body></html>
