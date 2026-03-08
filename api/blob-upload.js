@@ -14,9 +14,51 @@ export default async function handler(req, res) {
     res.status(405).json({ error: "method_not_allowed" });
     return;
   }
+  const kvUrl = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     res.status(500).json({ error: "missing_blob_token" });
     return;
+  }
+  if (!kvUrl || !kvToken) {
+    res.status(500).json({ error: "missing_kv_config" });
+    return;
+  }
+  const SESSIONS_KEY = "caw_sessions_v1";
+  function parseJSON(result, fallback) {
+    if (result == null) return fallback;
+    if (typeof result === "string") {
+      try {
+        return JSON.parse(result);
+      } catch {
+        return fallback;
+      }
+    }
+    return result ?? fallback;
+  }
+  async function kvGet(key, fallback) {
+    const resp = await fetch(`${kvUrl}/get/${key}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${kvToken}` }
+    });
+    const data = await resp.json();
+    return parseJSON(data.result, fallback);
+  }
+  function normalizeSessions(sessions) {
+    if (!sessions || typeof sessions !== "object" || Array.isArray(sessions)) return {};
+    const next = {};
+    for (const [key, value] of Object.entries(sessions)) {
+      if (value && typeof value === "object" && typeof value.user === "string") {
+        next[key] = { user: value.user, admin: !!value.admin };
+      } else if (typeof value === "string") {
+        next[key] = { user: value, admin: false };
+      }
+    }
+    return next;
+  }
+  async function loadSessions() {
+    const sessions = (await kvGet(SESSIONS_KEY, {})) || {};
+    return normalizeSessions(sessions);
   }
   return handleUpload({
     req,
@@ -32,19 +74,9 @@ export default async function handler(req, res) {
       if (!tokenValue) {
         throw new Error("unauthorized");
       }
-      const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
-      const proto = req.headers["x-forwarded-proto"] || "https";
-      const sessionUrl = `${proto}://${host}/api/caw-board?action=session`;
-      const sessionResp = await fetch(sessionUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: tokenValue })
-      });
-      if (!sessionResp.ok) {
-        throw new Error("unauthorized");
-      }
-      const sessionData = await sessionResp.json();
-      if (!sessionData?.user) {
+      const sessions = await loadSessions();
+      const session = sessions[tokenValue];
+      if (!session || !session.user) {
         throw new Error("unauthorized");
       }
       return {
