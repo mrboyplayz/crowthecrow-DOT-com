@@ -75,6 +75,7 @@ const state={token:""};
 const MAX_UPLOAD=30*1024*1024;
 const MAX_VERCEL_UPLOAD=4*1024*1024;
 const CLOUD_KEYS={enabled:"caw_cloud_enabled",name:"caw_cloud_name",preset:"caw_cloud_preset"};
+const CLOUD_DEFAULTS={name:"dicbdelt3",preset:"caw_upload"};
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function showProgress(value){
   const el=qs("#upload-progress");
@@ -107,8 +108,8 @@ function loadState(){
   state.token=LS.getItem(KEY)||"";
   const enabled=LS.getItem(CLOUD_KEYS.enabled);
   if(enabled!=null)qs("#cloud-enabled").checked=enabled==="1";
-  const name=LS.getItem(CLOUD_KEYS.name)||"dicbdelt3";
-  const preset=LS.getItem(CLOUD_KEYS.preset)||"caw_upload";
+  const name=LS.getItem(CLOUD_KEYS.name)||CLOUD_DEFAULTS.name;
+  const preset=LS.getItem(CLOUD_KEYS.preset)||CLOUD_DEFAULTS.preset;
   qs("#cloud-name").value=name;
   qs("#cloud-preset").value=preset;
 }
@@ -208,10 +209,12 @@ async function postFromFile(file,type,title){
 }
 async function uploadToCloudinary(file,type){
   const enabled=qs("#cloud-enabled").checked;
-  const cloudName=qs("#cloud-name").value.trim();
-  const preset=qs("#cloud-preset").value.trim();
+  const cloudName=(qs("#cloud-name").value||"").trim()||CLOUD_DEFAULTS.name;
+  const preset=(qs("#cloud-preset").value||"").trim()||CLOUD_DEFAULTS.preset;
+  qs("#cloud-name").value=cloudName;
+  qs("#cloud-preset").value=preset;
   saveCloud();
-  if(!enabled||!cloudName||!preset)return null;
+  if(!enabled||!cloudName||!preset){setStatus("missing cloudinary preset");return null}
   setStatus("uploading to cloudinary...");
   showProgress(null);
   const endpoint=`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/${type==="video"?"video":"image"}/upload`;
@@ -221,7 +224,15 @@ async function uploadToCloudinary(file,type){
   form.append("folder","caw-board");
   try{
     const resp=await fetch(endpoint,{method:"POST",body:form});
-    if(!resp.ok)return null;
+    if(!resp.ok){
+      let msg="cloudinary upload failed";
+      try{
+        const err=await resp.json();
+        msg=err?.error?.message||msg;
+      }catch{}
+      setStatus(msg);
+      return null;
+    }
     const data=await resp.json();
     return data.secure_url||data.url||null;
   }catch{
