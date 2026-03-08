@@ -60,16 +60,14 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
     </div>
   </div>
 </div>
-<script type="module">
-import { upload } from "https://esm.sh/@vercel/blob/client";
+<script>
 const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
-const blobUploadUrls=[apiBase?`${apiBase}/api/blob-upload`:"","/api/blob-upload"].filter(Boolean);
 const KEY="caw_session_token";
 const state={token:""};
-const MAX_UPLOAD=2147483648;
+const MAX_UPLOAD=4*1024*1024;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function showProgress(value){
   const el=qs("#upload-progress");
@@ -101,33 +99,13 @@ async function apiPost(action,body,timeoutMs=30000){
 function loadState(){
   state.token=LS.getItem(KEY)||"";
 }
-async function uploadToBlob(file){
-  if(!state.token)return {url:null,error:"sign in required"};
-  const sessionCheck=await apiPost("session",{token:state.token});
-  if(!sessionCheck?.ok){
-    state.token="";
-    LS.removeItem(KEY);
-    return {url:null,error:"session expired"};
-  }
-  let lastError="blob upload failed";
-  for(const handleUploadUrl of blobUploadUrls){
-    try{
-      const result=await upload(file.name||"upload.bin",file,{
-        access:"public",
-        handleUploadUrl,
-        clientPayload:JSON.stringify({token:state.token}),
-        onUploadProgress:progress=>{
-          const pct=Math.max(0,Math.min(100,Math.round(progress.percentage||0)));
-          showProgress(pct);
-        }
-      });
-      if(result?.url)return {url:result.url,error:null};
-      lastError="blob upload failed";
-    }catch(err){
-      lastError=String(err?.message||err||"blob upload failed");
-    }
-  }
-  return {url:null,error:lastError};
+function fileToDataUrl(file){
+  return new Promise(resolve=>{
+    const reader=new FileReader();
+    reader.onerror=()=>resolve("");
+    reader.onload=()=>resolve(typeof reader.result==="string"?reader.result:"");
+    reader.readAsDataURL(file);
+  });
 }
 function supportsCompression(){
   return typeof MediaRecorder!=="undefined"&&typeof HTMLCanvasElement!=="undefined";
@@ -201,7 +179,7 @@ async function refreshSession(){
   }
 }
 async function postFromFile(file,type,title){
-  if(file.size>MAX_UPLOAD){setStatus("file too big for blob upload");return}
+  if(file.size>MAX_UPLOAD){setStatus("file too big for server upload, use URL");return}
   const shouldCompress=type==="video"&&qs("#compress-video").checked;
   let uploadFile=file;
   if(shouldCompress){
@@ -214,11 +192,13 @@ async function postFromFile(file,type,title){
     if(!blob){setStatus("compression failed");hideProgress();return}
     uploadFile=new File([blob],file.name.replace(/\.[^/.]+$/,"")+".webm",{type:blob.type||"video/webm"});
   }
-  setStatus("uploading...");
-  showProgress(0);
-  const blobResult=await uploadToBlob(uploadFile);
-  if(!blobResult?.url){setStatus(blobResult?.error||"blob upload failed");hideProgress();return}
-  const resp=await apiPost("create_post",{token:state.token,title,type,url:blobResult.url},45000);
+  if(uploadFile.size>MAX_UPLOAD){setStatus("file too big for server upload, use URL");hideProgress();return}
+  setStatus("preparing...");
+  showProgress(null);
+  const dataUrl=await fileToDataUrl(uploadFile);
+  if(!dataUrl){setStatus("file read failed");hideProgress();return}
+  setStatus("saving...");
+  const resp=await apiPost("create_post",{token:state.token,title,type,url:dataUrl},45000);
   const postId=resp?.post?.id||resp?.id||"";
   if(!resp||!postId){setStatus("post save failed");hideProgress();return}
   location.href=`/post/?id=${encodeURIComponent(postId)}`;
