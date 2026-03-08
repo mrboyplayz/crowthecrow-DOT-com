@@ -67,8 +67,7 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 <script>
 const qs=e=>document.querySelector(e);
 const LS=localStorage;
-const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
-const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
+const apiUrl="/api/caw-board";
 const KEY="caw_session_token";
 const state={token:"",isVerified:false};
 const MAX_UPLOAD=4*1024*1024;
