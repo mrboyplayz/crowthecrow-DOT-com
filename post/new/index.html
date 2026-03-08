@@ -66,7 +66,7 @@ const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
-const blobUploadUrl=apiBase?`${apiBase}/api/blob-upload`:"/api/blob-upload";
+const blobUploadUrl="/api/blob-upload";
 const KEY="caw_session_token";
 const state={token:""};
 const MAX_UPLOAD=2147483648;
