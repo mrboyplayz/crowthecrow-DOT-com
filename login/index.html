@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caw-board /login</title>
+<style>
+body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-serif}
+#page{max-width:520px;margin:40px auto 60px;padding:0 12px}
+.panel{background:#2a2a2a;border:2px inset #111;padding:12px}
+.panel h3{margin:0 0 10px 0;font-size:16px;color:#ffd17a}
+.label{font-size:12px;color:#bbb;margin-bottom:4px}
+.input{width:100%;box-sizing:border-box;background:#111;color:#e6e6e6;border:1px solid #555;padding:6px;font-size:12px}
+.btn{background:linear-gradient(#5e5e5e,#3a3a3a);color:#fff;border:1px solid #222;padding:6px 10px;font-size:12px;cursor:pointer}
+.btn:active{transform:translateY(1px)}
+.muted{color:#a7a7a7;font-size:11px}
+.links{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+</style></head>
+<body>
+<div id="page">
+  <div class="panel">
+    <h3>/login</h3>
+    <div class="muted" style="margin-bottom:8px">Admin uses the same login.</div>
+    <div class="label">Username</div>
+    <input id="login-user" class="input" placeholder="username">
+    <div class="label" style="margin-top:8px">Password</div>
+    <input id="login-pass" class="input" type="password" placeholder="password">
+    <button id="login-btn" class="btn" style="margin-top:10px">Sign In</button>
+    <div id="status" class="muted" style="margin-top:8px"></div>
+    <div class="links">
+      <a class="btn" href="/signup/">/signup</a>
+      <a class="btn" href="/caw-board/">/caw-board</a>
+    </div>
+  </div>
+</div>
+<script>
+const qs=e=>document.querySelector(e);
+const LS=localStorage;
+const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
+const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
+const KEY="caw_session_token";
+function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
+async function apiPost(action,body){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action",action);
+  const resp=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  if(!resp.ok)return null;
+  return resp.json();
+}
+function setToken(token){
+  if(token)LS.setItem(KEY,token);else LS.removeItem(KEY);
+}
+async function login(){
+  const u=qs("#login-user").value.trim();
+  const p=qs("#login-pass").value;
+  if(!u||!p){setStatus("invalid login");return}
+  setStatus("");
+  const resp=await apiPost("login",{username:u,password:p});
+  if(!resp||!resp.token){setStatus("login failed");return}
+  setToken(resp.token);
+  location.href="/caw-board/";
+}
+async function refreshSession(){
+  const token=LS.getItem(KEY)||"";
+  if(!token)return;
+  const data=await apiPost("session",{token});
+  if(data&&data.user){location.href="/caw-board/";}
+}
+qs("#login-btn").onclick=login;
+refreshSession();
+</script>
+</body></html>

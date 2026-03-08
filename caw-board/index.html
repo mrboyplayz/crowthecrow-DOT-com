@@ -32,9 +32,6 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .comment-text{font-size:12px;color:#e8e8e8}
 .admin-tag{color:#ffcc66;font-weight:700}
 .hidden{display:none}
-.auth-tabs{display:flex;gap:6px;margin:6px 0}
-.tab{padding:4px 8px}
-.tab.active{outline:1px inset #da06;color:#ffd17a}
 </style></head>
 <body>
 <div id="page">
@@ -48,23 +45,11 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
           <h3>Account</h3>
           <div class="warn">Use a completely different password from your usual passwords.</div>
           <div id="auth-logged-out">
-            <div class="auth-tabs">
-              <button id="tab-login" class="btn tab active">/login</button>
-              <button id="tab-signup" class="btn tab">/signup</button>
-            </div>
-            <div id="login-panel">
-              <div class="label">Login</div>
-              <input id="login-user" class="input" placeholder="username">
-              <input id="login-pass" class="input" type="password" placeholder="password">
-              <button id="login-btn" class="btn">Sign In</button>
-            </div>
-            <div id="signup-panel" class="hidden">
-              <div class="label">Create account</div>
-              <input id="signup-user" class="input" placeholder="username">
-              <input id="signup-pass" class="input" type="password" placeholder="password">
-              <input id="signup-pass2" class="input" type="password" placeholder="confirm password">
-              <button id="signup-btn" class="btn">Create Account</button>
-            </div>
+            <div class="label">/login</div>
+            <a class="btn" href="/login/">Go to /login</a>
+            <div class="label" style="margin-top:8px">/signup</div>
+            <a class="btn" href="/signup/">Go to /signup</a>
+            <div class="muted" style="margin-top:8px">Admin uses /login too.</div>
           </div>
           <div id="auth-logged-in" class="hidden">
             <div class="label">Signed in as <span id="session-user"></span></div>
@@ -107,7 +92,7 @@ const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEYS={token:"caw_session_token"};
-const state={posts:[],sessionUser:null,token:"",isAdmin:false,authView:"login"};
+const state={posts:[],sessionUser:null,token:"",isAdmin:false};
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 async function apiGet(action,params){
@@ -134,15 +119,6 @@ function setToken(token){
   if(token)LS.setItem(KEYS.token,token);else LS.removeItem(KEYS.token);
 }
 function isAdmin(){return state.isAdmin}
-function setAuthView(view){
-  state.authView=view;
-  const loginTab=qs("#tab-login");
-  const signupTab=qs("#tab-signup");
-  loginTab.classList.toggle("active",view==="login");
-  signupTab.classList.toggle("active",view==="signup");
-  qs("#login-panel").classList.toggle("hidden",view!=="login");
-  qs("#signup-panel").classList.toggle("hidden",view!=="signup");
-}
 function renderAuth(){
   const loggedIn=!!state.sessionUser;
   qs("#auth-logged-out").classList.toggle("hidden",loggedIn);
@@ -228,33 +204,6 @@ function renderPosts(){
     postsEl.appendChild(wrap);
   });
 }
-async function signup(){
-  const u=qs("#signup-user").value.trim();
-  const p=qs("#signup-pass").value;
-  const p2=qs("#signup-pass2").value;
-  if(!u||!p||p!==p2||u.length<3||p.length<6){setStatus("invalid signup");return}
-  setStatus("");
-  const resp=await apiPost("signup",{username:u,password:p});
-  if(!resp||!resp.token){setStatus("signup failed");return}
-  setToken(resp.token);
-  state.sessionUser=resp.user||u;
-  state.isAdmin=!!resp.admin;
-  renderAuth();
-  await fetchPosts();
-}
-async function login(){
-  const u=qs("#login-user").value.trim();
-  const p=qs("#login-pass").value;
-  if(!u||!p){setStatus("invalid login");return}
-  setStatus("");
-  const resp=await apiPost("login",{username:u,password:p});
-  if(!resp||!resp.token){setStatus("login failed");return}
-  setToken(resp.token);
-  state.sessionUser=resp.user||u;
-  state.isAdmin=!!resp.admin;
-  renderAuth();
-  await fetchPosts();
-}
 function logout(){
   setToken("");
   state.sessionUser=null;
@@ -263,7 +212,7 @@ function logout(){
   renderPosts();
 }
 async function postFromFile(file,type,title){
-  if(file.size>2*1024*1024){setStatus("file too big, use a URL");return}
+  if(file.size>5*1024*1024){setStatus("file too big, use a URL");return}
   const r=new FileReader();
   r.onload=async()=>{
     const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result});
@@ -304,15 +253,10 @@ async function refreshSession(){
   renderAuth();
 }
 function wire(){
-  qs("#tab-login").onclick=()=>setAuthView("login");
-  qs("#tab-signup").onclick=()=>setAuthView("signup");
-  qs("#signup-btn").onclick=signup;
-  qs("#login-btn").onclick=login;
   qs("#logout-btn").onclick=logout;
   qs("#post-btn").onclick=postCreate;
 }
 loadState();
-setAuthView("login");
 wire();
 refreshSession().then(fetchPosts);
 </script>
