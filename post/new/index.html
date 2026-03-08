@@ -60,11 +60,13 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
     </div>
   </div>
 </div>
-<script>
+<script type="module">
+import { upload } from "https://esm.sh/@vercel/blob/client";
 const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
+const blobUploadUrl=apiBase?`${apiBase}/api/blob-upload`:"/api/blob-upload";
 const KEY="caw_session_token";
 const state={token:""};
 const MAX_UPLOAD=30*1024*1024;
@@ -99,6 +101,24 @@ async function apiPost(action,body,timeoutMs=30000){
 }
 function loadState(){
   state.token=LS.getItem(KEY)||"";
+}
+async function uploadToBlob(file){
+  if(!state.token)return null;
+  try{
+    const result=await upload(file.name||"upload.bin",file,{
+      access:"public",
+      handleUploadUrl:blobUploadUrl,
+      clientPayload:JSON.stringify({token:state.token}),
+      addRandomSuffix:true,
+      onUploadProgress:progress=>{
+        const pct=Math.max(0,Math.min(100,Math.round(progress.percentage||0)));
+        showProgress(pct);
+      }
+    });
+    return result?.url||null;
+  }catch{
+    return null;
+  }
 }
 function supportsCompression(){
   return typeof MediaRecorder!=="undefined"&&typeof HTMLCanvasElement!=="undefined";
@@ -185,26 +205,14 @@ async function postFromFile(file,type,title){
     if(!blob){setStatus("compression failed");hideProgress();return}
     uploadFile=new File([blob],file.name.replace(/\.[^/.]+$/,"")+".webm",{type:blob.type||"video/webm"});
   }
-  if(apiBase&&uploadFile.size>MAX_VERCEL_UPLOAD){setStatus("file too big for server upload, use a URL");return}
-  const r=new FileReader();
-  r.onloadstart=()=>{setStatus("reading file...");showProgress(0)};
-  r.onprogress=e=>{
-    if(e.lengthComputable){
-      const pct=Math.max(0,Math.min(100,Math.round((e.loaded/e.total)*100)));
-      showProgress(pct);
-    }
-  };
-  r.onload=async()=>{
-    setStatus("uploading...");
-    showProgress(null);
-    const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result},45000);
-    const postId=resp?.post?.id||resp?.id||"";
-    if(!resp||!postId){setStatus("upload failed or timed out");hideProgress();return}
-    location.href=`/post/?id=${encodeURIComponent(postId)}`;
-  };
-  r.onerror=()=>{setStatus("file read failed");hideProgress()};
-  r.onloadend=()=>{if(qs("#upload-progress"))showProgress(100)};
-  r.readAsDataURL(uploadFile);
+  setStatus("uploading...");
+  showProgress(0);
+  const blobUrl=await uploadToBlob(uploadFile);
+  if(!blobUrl){setStatus("blob upload failed");hideProgress();return}
+  const resp=await apiPost("create_post",{token:state.token,title,type,url:blobUrl},45000);
+  const postId=resp?.post?.id||resp?.id||"";
+  if(!resp||!postId){setStatus("post save failed");hideProgress();return}
+  location.href=`/post/?id=${encodeURIComponent(postId)}`;
 }
 async function postFromUrl(url,type,title){
   const resp=await apiPost("create_post",{token:state.token,title,type,url});

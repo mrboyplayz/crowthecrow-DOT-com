@@ -1,0 +1,8 @@
+{
+  "name": "crowthecrow-dot-com",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@vercel/blob": "latest"
+  }
+}
