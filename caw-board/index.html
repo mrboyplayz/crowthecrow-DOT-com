@@ -3,11 +3,9 @@
 <meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Caw-board</title>
-<link rel="stylesheet" href="/smlwiki/header.css">
 <style>
 body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-serif}
-#header-container{position:fixed;top:0;width:100%;z-index:3;height:80px}
-#page{max-width:980px;margin:110px auto 60px;padding:0 12px}
+#page{max-width:980px;margin:30px auto 60px;padding:0 12px}
 .board-frame{width:100%;border:3px ridge #4a4a4a;background:#222}
 .board-title{background:linear-gradient(#4b4b4b,#2c2c2c);padding:8px 12px;border-bottom:2px solid #111;font-size:20px;letter-spacing:.5px}
 .board-sub{font-size:12px;color:#c0c0c0}
@@ -34,9 +32,11 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .comment-text{font-size:12px;color:#e8e8e8}
 .admin-tag{color:#ffcc66;font-weight:700}
 .hidden{display:none}
+.auth-tabs{display:flex;gap:6px;margin:6px 0}
+.tab{padding:4px 8px}
+.tab.active{outline:1px inset #da06;color:#ffd17a}
 </style></head>
 <body>
-<div id="header-container"></div>
 <div id="page">
   <table class="board-frame" cellpadding="0" cellspacing="0">
     <tr><td colspan="2">
@@ -48,33 +48,27 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
           <h3>Account</h3>
           <div class="warn">Use a completely different password from your usual passwords.</div>
           <div id="auth-logged-out">
-            <div class="label">Create account</div>
-            <input id="signup-user" class="input" placeholder="username">
-            <input id="signup-pass" class="input" type="password" placeholder="password">
-            <input id="signup-pass2" class="input" type="password" placeholder="confirm password">
-            <button id="signup-btn" class="btn">Create Account</button>
-            <div class="label" style="margin-top:8px">Sign in</div>
-            <input id="login-user" class="input" placeholder="username">
-            <input id="login-pass" class="input" type="password" placeholder="password">
-            <button id="login-btn" class="btn">Sign In</button>
+            <div class="auth-tabs">
+              <button id="tab-login" class="btn tab active">/login</button>
+              <button id="tab-signup" class="btn tab">/signup</button>
+            </div>
+            <div id="login-panel">
+              <div class="label">Login</div>
+              <input id="login-user" class="input" placeholder="username">
+              <input id="login-pass" class="input" type="password" placeholder="password">
+              <button id="login-btn" class="btn">Sign In</button>
+            </div>
+            <div id="signup-panel" class="hidden">
+              <div class="label">Create account</div>
+              <input id="signup-user" class="input" placeholder="username">
+              <input id="signup-pass" class="input" type="password" placeholder="password">
+              <input id="signup-pass2" class="input" type="password" placeholder="confirm password">
+              <button id="signup-btn" class="btn">Create Account</button>
+            </div>
           </div>
           <div id="auth-logged-in" class="hidden">
             <div class="label">Signed in as <span id="session-user"></span></div>
             <button id="logout-btn" class="btn">Sign Out</button>
-          </div>
-        </div>
-        <div class="panel">
-          <h3>Admin</h3>
-          <div class="muted">Moderation is only for you. Admin password is set in Vercel.</div>
-          <div id="admin-login">
-            <div class="label">Admin login</div>
-            <input id="admin-user" class="input" placeholder="admin username">
-            <input id="admin-pass" class="input" type="password" placeholder="admin password">
-            <button id="admin-login-btn" class="btn">Admin Login</button>
-          </div>
-          <div id="admin-on" class="hidden">
-            <div class="label">Admin mode <span class="admin-tag">ON</span></div>
-            <button id="admin-logout-btn" class="btn">Admin Logout</button>
           </div>
         </div>
         <div class="panel">
@@ -108,16 +102,12 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
   </table>
 </div>
 <script>
-const enc=new TextEncoder();
 const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
-const KEYS={token:"caw_session_token",admin:"caw_admin_pass",adminUser:"caw_admin_user"};
-const state={posts:[],sessionUser:null,token:"",adminPass:"",adminUser:"",adminOk:false};
-function b64(bytes){return btoa(String.fromCharCode(...bytes))}
-function randomSalt(){const b=new Uint8Array(16);crypto.getRandomValues(b);return b64(b)}
-async function hashPass(pass,salt){const data=enc.encode(salt+pass);const buf=await crypto.subtle.digest("SHA-256",data);return b64(new Uint8Array(buf))}
+const KEYS={token:"caw_session_token"};
+const state={posts:[],sessionUser:null,token:"",isAdmin:false,authView:"login"};
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 async function apiGet(action,params){
@@ -128,43 +118,38 @@ async function apiGet(action,params){
   if(!resp.ok)return null;
   return resp.json();
 }
-async function apiPost(action,body,adminPass,adminUser){
+async function apiPost(action,body){
   const url=new URL(apiUrl,location.origin);
   url.searchParams.set("action",action);
   const headers={"Content-Type":"application/json"};
-  if(adminPass)headers["X-Admin"]=adminPass;
-  if(adminUser)headers["X-Admin-User"]=adminUser;
   const resp=await fetch(url,{method:"POST",headers,body:JSON.stringify(body||{})});
   if(!resp.ok)return null;
   return resp.json();
 }
 function loadState(){
   state.token=LS.getItem(KEYS.token)||"";
-  state.adminPass=LS.getItem(KEYS.admin)||"";
-  state.adminUser=LS.getItem(KEYS.adminUser)||"";
 }
 function setToken(token){
   state.token=token||"";
   if(token)LS.setItem(KEYS.token,token);else LS.removeItem(KEYS.token);
 }
-function setAdminPass(pass){
-  state.adminPass=pass||"";
-  if(pass)LS.setItem(KEYS.admin,pass);else LS.removeItem(KEYS.admin);
+function isAdmin(){return state.isAdmin}
+function setAuthView(view){
+  state.authView=view;
+  const loginTab=qs("#tab-login");
+  const signupTab=qs("#tab-signup");
+  loginTab.classList.toggle("active",view==="login");
+  signupTab.classList.toggle("active",view==="signup");
+  qs("#login-panel").classList.toggle("hidden",view!=="login");
+  qs("#signup-panel").classList.toggle("hidden",view!=="signup");
 }
-function setAdminUser(user){
-  state.adminUser=user||"";
-  if(user)LS.setItem(KEYS.adminUser,user);else LS.removeItem(KEYS.adminUser);
-}
-function isAdmin(){return state.adminOk}
 function renderAuth(){
   const loggedIn=!!state.sessionUser;
   qs("#auth-logged-out").classList.toggle("hidden",loggedIn);
   qs("#auth-logged-in").classList.toggle("hidden",!loggedIn);
-  qs("#session-user").textContent=state.sessionUser||"";
+  qs("#session-user").textContent=state.sessionUser?`${state.sessionUser}${state.isAdmin?" (admin)":""}`:"";
   qs("#post-locked").classList.toggle("hidden",loggedIn);
   qs("#post-form").classList.toggle("hidden",!loggedIn);
-  qs("#admin-login").classList.toggle("hidden",isAdmin());
-  qs("#admin-on").classList.toggle("hidden",!isAdmin());
 }
 function renderPosts(){
   const postsEl=qs("#posts");
@@ -191,7 +176,7 @@ function renderPosts(){
       del.textContent="Delete Post";
       del.onclick=async()=>{
         setStatus("");
-        const ok=await apiPost("admin_delete_post",{postId:p.id},state.adminPass,state.adminUser);
+        const ok=await apiPost("admin_delete_post",{token:state.token,postId:p.id});
         if(!ok){setStatus("admin delete failed");return}
         await fetchPosts();
       };
@@ -210,7 +195,7 @@ function renderPosts(){
         cbtn.textContent="Delete Comment";
         cbtn.onclick=async()=>{
           setStatus("");
-          const ok=await apiPost("admin_delete_comment",{postId:p.id,commentId:c.id},state.adminPass,state.adminUser);
+          const ok=await apiPost("admin_delete_comment",{token:state.token,postId:p.id,commentId:c.id});
           if(!ok){setStatus("admin delete failed");return}
           await fetchPosts();
         };
@@ -218,7 +203,7 @@ function renderPosts(){
       }
       cwrap.appendChild(cdiv);
     });
-    if(state.session){
+    if(state.sessionUser){
       const form=document.createElement("div");
       form.className="comment";
       const inp=document.createElement("input");
@@ -249,12 +234,11 @@ async function signup(){
   const p2=qs("#signup-pass2").value;
   if(!u||!p||p!==p2||u.length<3||p.length<6){setStatus("invalid signup");return}
   setStatus("");
-  const salt=randomSalt();
-  const hash=await hashPass(p,salt);
-  const resp=await apiPost("signup",{username:u,salt,hash});
+  const resp=await apiPost("signup",{username:u,password:p});
   if(!resp||!resp.token){setStatus("signup failed");return}
   setToken(resp.token);
   state.sessionUser=resp.user||u;
+  state.isAdmin=!!resp.admin;
   renderAuth();
   await fetchPosts();
 }
@@ -263,44 +247,23 @@ async function login(){
   const p=qs("#login-pass").value;
   if(!u||!p){setStatus("invalid login");return}
   setStatus("");
-  const saltResp=await apiGet("user_salt",{username:u});
-  if(!saltResp||!saltResp.salt){setStatus("user not found");return}
-  const hash=await hashPass(p,saltResp.salt);
-  const resp=await apiPost("login",{username:u,hash});
+  const resp=await apiPost("login",{username:u,password:p});
   if(!resp||!resp.token){setStatus("login failed");return}
   setToken(resp.token);
   state.sessionUser=resp.user||u;
+  state.isAdmin=!!resp.admin;
   renderAuth();
   await fetchPosts();
 }
 function logout(){
   setToken("");
   state.sessionUser=null;
-  renderAuth();
-  renderPosts();
-}
-async function adminLogin(){
-  const u=qs("#admin-user").value.trim();
-  const p=qs("#admin-pass").value;
-  if(!u||!p){setStatus("admin username and password required");return}
-  setStatus("");
-  const ok=await apiPost("admin_check",{},p,u);
-  if(!ok||!ok.ok){setStatus("admin login failed");return}
-  setAdminPass(p);
-  setAdminUser(u);
-  state.adminOk=true;
-  renderAuth();
-  renderPosts();
-}
-function adminLogout(){
-  setAdminPass("");
-  setAdminUser("");
-  state.adminOk=false;
+  state.isAdmin=false;
   renderAuth();
   renderPosts();
 }
 async function postFromFile(file,type,title){
-  if(file.size>200*1024){setStatus("file too big, use a URL");return}
+  if(file.size>2*1024*1024){setStatus("file too big, use a URL");return}
   const r=new FileReader();
   r.onload=async()=>{
     const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result});
@@ -337,28 +300,20 @@ async function fetchPosts(){
 async function refreshSession(){
   if(!state.token){state.sessionUser=null;renderAuth();return}
   const data=await apiPost("session",{token:state.token});
-  if(!data||!data.user){setToken("");state.sessionUser=null}else{state.sessionUser=data.user}
-  renderAuth();
-}
-async function refreshAdmin(){
-  if(!state.adminPass||!state.adminUser){state.adminOk=false;renderAuth();return}
-  const data=await apiPost("admin_check",{},state.adminPass,state.adminUser);
-  state.adminOk=!!data?.ok;
+  if(!data||!data.user){setToken("");state.sessionUser=null;state.isAdmin=false}else{state.sessionUser=data.user;state.isAdmin=!!data.admin}
   renderAuth();
 }
 function wire(){
+  qs("#tab-login").onclick=()=>setAuthView("login");
+  qs("#tab-signup").onclick=()=>setAuthView("signup");
   qs("#signup-btn").onclick=signup;
   qs("#login-btn").onclick=login;
   qs("#logout-btn").onclick=logout;
-  qs("#admin-login-btn").onclick=adminLogin;
-  qs("#admin-logout-btn").onclick=adminLogout;
   qs("#post-btn").onclick=postCreate;
 }
 loadState();
+setAuthView("login");
 wire();
 refreshSession().then(fetchPosts);
-refreshAdmin();
-const hc=qs("#header-container");
-hc&&fetch("/global/header.html").then(e=>e.text()).then(e=>{hc.innerHTML=e});
 </script>
 </body></html>
