@@ -404,6 +404,27 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true });
       return;
     }
+    if (req.method === "POST" && action === "admin_users") {
+      const tokenValue = String(body?.token || "");
+      if (!tokenValue) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const sessions = await loadSessions();
+      const session = sessions[tokenValue];
+      if (!session || !session.admin) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const users = (await kvGet(USERS_KEY, {})) || {};
+      const list = Object.entries(users).map(([user, info]) => ({
+        user,
+        created: Number(info?.created || 0)
+      }));
+      list.sort((a, b) => b.created - a.created);
+      res.status(200).json({ ok: true, users: list });
+      return;
+    }
     if (req.method === "POST" && action === "admin_delete_comment") {
       const tokenValue = String(body?.token || "");
       if (!tokenValue) {

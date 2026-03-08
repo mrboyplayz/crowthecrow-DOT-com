@@ -34,6 +34,7 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .comment-meta{font-size:11px;color:#bdbdbd}
 .comment-text{font-size:12px;color:#e8e8e8}
 .admin-tag{color:#ffcc66;font-weight:700}
+.users-list{max-height:220px;overflow:auto;white-space:pre-wrap}
 .hidden{display:none}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
 .topbar-links{display:flex;gap:8px;flex-wrap:wrap}
@@ -61,6 +62,9 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
         <div id="admin-panel" class="panel hidden">
           <h3>Admin</h3>
           <button id="wipe-btn" class="btn">Wipe All Posts</button>
+          <div class="label" style="margin-top:8px">Users</div>
+          <button id="load-users-btn" class="btn">Load Users</button>
+          <div id="users-list" class="muted users-list"></div>
         </div>
       </td>
       <td class="main">
@@ -83,7 +87,7 @@ const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEYS={token:"caw_session_token"};
-const state={posts:[],sessionUser:null,token:"",isAdmin:false};
+const state={posts:[],users:[],sessionUser:null,token:"",isAdmin:false};
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 async function apiGet(action,params){
@@ -118,6 +122,19 @@ function renderAuth(){
   qs("#post-locked").classList.toggle("hidden",loggedIn);
   qs("#post-link").classList.toggle("hidden",!loggedIn);
   qs("#admin-panel").classList.toggle("hidden",!state.isAdmin);
+  if(!state.isAdmin){
+    state.users=[];
+    renderUsers();
+  }
+}
+function renderUsers(){
+  const listEl=qs("#users-list");
+  if(!listEl)return;
+  if(!state.isAdmin||!state.users.length){listEl.textContent="";return}
+  listEl.textContent=state.users.map(u=>{
+    const created=u.created?` • ${fmtTime(u.created)}`:"";
+    return `${u.user}${created}`;
+  }).join("\n");
 }
 function renderPosts(){
   const postsEl=qs("#posts");
@@ -188,6 +205,15 @@ async function adminWipe(){
   if(!ok){setStatus("wipe failed");return}
   await fetchPosts();
 }
+async function adminLoadUsers(){
+  if(!state.isAdmin)return;
+  setStatus("");
+  const data=await apiPost("admin_users",{token:state.token});
+  if(!data||!Array.isArray(data.users)){setStatus("load users failed");return}
+  state.users=data.users;
+  renderUsers();
+  setStatus(`loaded ${state.users.length} users`);
+}
 async function fetchPosts(){
   const data=await apiGet("posts");
   state.posts=Array.isArray(data?.posts)?data.posts:[];
@@ -202,6 +228,7 @@ async function refreshSession(){
 function wire(){
   qs("#logout-btn").onclick=logout;
   qs("#wipe-btn").onclick=adminWipe;
+  qs("#load-users-btn").onclick=adminLoadUsers;
 }
 loadState();
 wire();
