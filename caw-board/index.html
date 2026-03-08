@@ -129,7 +129,7 @@ function renderPosts(){
     const head=document.createElement("div");
     head.className="post-head";
     const safeTitle=p.title||"(untitled)";
-    head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
+    head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/?id=${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
     const body=document.createElement("div");
     body.className="post-body";
     const media=document.createElement(p.type==="video"?"video":"img");

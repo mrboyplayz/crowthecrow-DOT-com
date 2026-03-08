@@ -79,14 +79,14 @@ async function postFromFile(file,type,title){
   r.onload=async()=>{
     const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result});
     if(!resp||!resp.post){setStatus("post failed");return}
-    location.href=`/post/${encodeURIComponent(resp.post.id)}`;
+    location.href=`/post/?id=${encodeURIComponent(resp.post.id)}`;
   };
   r.readAsDataURL(file);
 }
 async function postFromUrl(url,type,title){
   const resp=await apiPost("create_post",{token:state.token,title,type,url});
   if(!resp||!resp.post){setStatus("post failed");return}
-  location.href=`/post/${encodeURIComponent(resp.post.id)}`;
+  location.href=`/post/?id=${encodeURIComponent(resp.post.id)}`;
 }
 function deriveTitle({title,file,url}){
   if(title)return title;

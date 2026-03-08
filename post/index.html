@@ -66,7 +66,9 @@ const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEYS={token:"caw_session_token"};
 const state={token:"",sessionUser:null,isAdmin:false,post:null,posts:[]};
 const pathParts=location.pathname.split("/").filter(Boolean);
-const postId=(pathParts[0]==="post"&&pathParts[1])?decodeURIComponent(pathParts[1]):"";
+const queryId=new URLSearchParams(location.search).get("id")||"";
+const hashId=(location.hash||"").replace(/^#/,"");
+const postId=queryId||(pathParts[0]==="post"&&pathParts[1]?decodeURIComponent(pathParts[1]):"")||hashId;
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 async function apiGet(action,params){
@@ -214,7 +216,7 @@ function renderList(){
     const head=document.createElement("div");
     head.className="post-head";
     const safeTitle=p.title||"(untitled)";
-    head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
+    head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/?id=${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
     const body=document.createElement("div");
     body.className="post-body";
     const media=document.createElement(p.type==="video"?"video":"img");
