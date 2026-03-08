@@ -44,7 +44,7 @@ export default async function handler(req, res) {
       return {
         access: "public",
         addRandomSuffix: true,
-        maximumSizeInBytes: 524288000
+        maximumSizeInBytes: 2147483648
       };
     },
     onUploadCompleted: async () => {}

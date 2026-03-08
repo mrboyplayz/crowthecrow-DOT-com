@@ -69,8 +69,7 @@ const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const blobUploadUrl=apiBase?`${apiBase}/api/blob-upload`:"/api/blob-upload";
 const KEY="caw_session_token";
 const state={token:""};
-const MAX_UPLOAD=524288000;
-const MAX_VERCEL_UPLOAD=4*1024*1024;
+const MAX_UPLOAD=2147483648;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function showProgress(value){
   const el=qs("#upload-progress");
@@ -192,7 +191,7 @@ async function refreshSession(){
   }
 }
 async function postFromFile(file,type,title){
-  if(file.size>MAX_UPLOAD){setStatus("file too big, use a URL");return}
+  if(file.size>MAX_UPLOAD){setStatus("file too big for blob upload");return}
   const shouldCompress=type==="video"&&qs("#compress-video").checked;
   let uploadFile=file;
   if(shouldCompress){
