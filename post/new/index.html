@@ -66,7 +66,7 @@ const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
-const blobUploadUrl=apiBase?`${apiBase}/api/blob-upload`:"/api/blob-upload";
+const blobUploadUrls=[apiBase?`${apiBase}/api/blob-upload`:"","/api/blob-upload"].filter(Boolean);
 const KEY="caw_session_token";
 const state={token:""};
 const MAX_UPLOAD=2147483648;
@@ -103,21 +103,31 @@ function loadState(){
 }
 async function uploadToBlob(file){
   if(!state.token)return {url:null,error:"sign in required"};
-  try{
-    const result=await upload(file.name||"upload.bin",file,{
-      access:"public",
-      handleUploadUrl:blobUploadUrl,
-      clientPayload:JSON.stringify({token:state.token}),
-      onUploadProgress:progress=>{
-        const pct=Math.max(0,Math.min(100,Math.round(progress.percentage||0)));
-        showProgress(pct);
-      }
-    });
-    return {url:result?.url||null,error:result?.url?null:"blob upload failed"};
-  }catch(err){
-    const message=String(err?.message||err||"blob upload failed");
-    return {url:null,error:message};
+  const sessionCheck=await apiPost("session",{token:state.token});
+  if(!sessionCheck?.ok){
+    state.token="";
+    LS.removeItem(KEY);
+    return {url:null,error:"session expired"};
   }
+  let lastError="blob upload failed";
+  for(const handleUploadUrl of blobUploadUrls){
+    try{
+      const result=await upload(file.name||"upload.bin",file,{
+        access:"public",
+        handleUploadUrl,
+        clientPayload:JSON.stringify({token:state.token}),
+        onUploadProgress:progress=>{
+          const pct=Math.max(0,Math.min(100,Math.round(progress.percentage||0)));
+          showProgress(pct);
+        }
+      });
+      if(result?.url)return {url:result.url,error:null};
+      lastError="blob upload failed";
+    }catch(err){
+      lastError=String(err?.message||err||"blob upload failed");
+    }
+  }
+  return {url:null,error:lastError};
 }
 function supportsCompression(){
   return typeof MediaRecorder!=="undefined"&&typeof HTMLCanvasElement!=="undefined";
