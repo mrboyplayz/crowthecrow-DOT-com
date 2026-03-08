@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caw-board /post</title>
+<style>
+body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-serif}
+#page{max-width:980px;margin:30px auto 60px;padding:0 12px}
+.panel{background:#2a2a2a;border:2px inset #111;padding:8px;margin-bottom:10px}
+.panel h3{margin:0 0 6px 0;font-size:14px;color:#ffd17a}
+.label{font-size:12px;color:#bbb;margin-bottom:4px}
+.input,.select{width:100%;box-sizing:border-box;background:#111;color:#e6e6e6;border:1px solid #555;padding:6px;font-size:12px}
+.btn{background:linear-gradient(#5e5e5e,#3a3a3a);color:#fff;border:1px solid #222;padding:6px 10px;font-size:12px;cursor:pointer}
+.btn:active{transform:translateY(1px)}
+.muted{color:#a7a7a7;font-size:11px}
+.warn{color:#ffb3b3;font-size:12px}
+.hidden{display:none}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.topbar-links{display:flex;gap:8px;flex-wrap:wrap}
+.board-title{background:linear-gradient(#4b4b4b,#2c2c2c);padding:8px 12px;border-bottom:2px solid #111;font-size:20px;letter-spacing:.5px}
+.board-sub{font-size:12px;color:#c0c0c0}
+#posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.post{background:#1e1e1e;border:2px solid #111}
+.post-head{background:#2f2f2f;padding:6px 10px;border-bottom:1px solid #111}
+.post-title{font-weight:700;color:#ffe3a3}
+.post-meta{font-size:11px;color:#bdbdbd}
+.post-body{padding:10px}
+.post-media{max-width:100%;border:1px solid #333;background:#000;display:block;width:100%;height:auto}
+.post-link{color:#ffe3a3;text-decoration:none}
+.post-link:hover{text-decoration:underline}
+.post-actions{margin-top:6px}
+.comment{background:#252525;border:1px solid #111;margin-top:6px;padding:6px}
+.comment-meta{font-size:11px;color:#bdbdbd}
+.comment-text{font-size:12px;color:#e8e8e8}
+</style></head>
+<body>
+<div id="page">
+  <div class="panel topbar">
+    <div class="board-title">Caw-board <span class="board-sub">/post</span></div>
+    <div id="auth-logged-out" class="topbar-links">
+      <a class="btn" href="/login/">/login</a>
+      <a class="btn" href="/signup/">/signup</a>
+    </div>
+    <div id="auth-logged-in" class="topbar-links hidden">
+      <div class="label">Signed in as <span id="session-user"></span></div>
+      <button id="logout-btn" class="btn">Sign Out</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="topbar-links">
+      <a class="btn" href="/caw-board/">/caw-board</a>
+      <a class="btn" href="/post/new/">/post/new</a>
+    </div>
+    <div id="status" class="muted" style="margin-top:6px"></div>
+  </div>
+  <div id="post-view" class="hidden"></div>
+  <div id="post-list" class="hidden">
+    <div id="posts"></div>
+  </div>
+</div>
+<script>
+const qs=e=>document.querySelector(e);
+const LS=localStorage;
+const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
+const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
+const KEYS={token:"caw_session_token"};
+const state={token:"",sessionUser:null,isAdmin:false,post:null,posts:[]};
+const pathParts=location.pathname.split("/").filter(Boolean);
+const postId=(pathParts[0]==="post"&&pathParts[1])?decodeURIComponent(pathParts[1]):"";
+function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
+function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
+async function apiGet(action,params){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action",action);
+  if(params)Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+  const resp=await fetch(url);
+  if(!resp.ok)return null;
+  return resp.json();
+}
+async function apiPost(action,body){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action",action);
+  const headers={"Content-Type":"application/json"};
+  const resp=await fetch(url,{method:"POST",headers,body:JSON.stringify(body||{})});
+  if(!resp.ok)return null;
+  return resp.json();
+}
+function loadState(){
+  state.token=LS.getItem(KEYS.token)||"";
+}
+function setToken(token){
+  state.token=token||"";
+  if(token)LS.setItem(KEYS.token,token);else LS.removeItem(KEYS.token);
+}
+function renderAuth(){
+  const loggedIn=!!state.sessionUser;
+  qs("#auth-logged-out").classList.toggle("hidden",loggedIn);
+  qs("#auth-logged-in").classList.toggle("hidden",!loggedIn);
+  qs("#session-user").textContent=state.sessionUser?`${state.sessionUser}${state.isAdmin?" (admin)":""}`:"";
+}
+async function refreshSession(){
+  if(!state.token){state.sessionUser=null;renderAuth();return}
+  const data=await apiPost("session",{token:state.token});
+  if(!data||!data.user){setToken("");state.sessionUser=null;state.isAdmin=false}else{state.sessionUser=data.user;state.isAdmin=!!data.admin}
+  renderAuth();
+}
+function renderPost(){
+  const post=state.post;
+  const wrap=qs("#post-view");
+  wrap.innerHTML="";
+  if(!post){
+    wrap.classList.remove("hidden");
+    wrap.innerHTML=`<div class="panel"><div class="muted">Post not found.</div></div>`;
+    return;
+  }
+  const panel=document.createElement("div");
+  panel.className="post";
+  const head=document.createElement("div");
+  head.className="post-head";
+  const safeTitle=post.title||"(untitled)";
+  head.innerHTML=`<div class="post-title">${safeTitle}</div><div class="post-meta">by ${post.user} • ${fmtTime(post.ts)}</div>`;
+  const body=document.createElement("div");
+  body.className="post-body";
+  const media=document.createElement(post.type==="video"?"video":"img");
+  media.className="post-media";
+  media.src=post.url;
+  if(post.type==="video"){media.controls=true}
+  body.appendChild(media);
+  let actions=null;
+  const ensureActions=()=>{
+    if(actions)return actions;
+    actions=document.createElement("div");
+    actions.className="post-actions";
+    body.appendChild(actions);
+    return actions;
+  };
+  if(state.sessionUser&&post.user===state.sessionUser){
+    const delOwn=document.createElement("button");
+    delOwn.className="btn";
+    delOwn.textContent="Delete My Post";
+    delOwn.onclick=async()=>{
+      setStatus("");
+      const ok=await apiPost("delete_post",{token:state.token,postId:post.id});
+      if(!ok){setStatus("delete failed");return}
+      location.href="/post/";
+    };
+    ensureActions().appendChild(delOwn);
+  }
+  if(state.isAdmin){
+    const del=document.createElement("button");
+    del.className="btn";
+    del.textContent="Delete Post";
+    del.onclick=async()=>{
+      setStatus("");
+      const ok=await apiPost("admin_delete_post",{token:state.token,postId:post.id});
+      if(!ok){setStatus("admin delete failed");return}
+      location.href="/post/";
+    };
+    ensureActions().appendChild(del);
+  }
+  const cwrap=document.createElement("div");
+  const comments=Array.isArray(post.comments)?post.comments:[];
+  comments.forEach(c=>{
+    const cdiv=document.createElement("div");
+    cdiv.className="comment";
+    cdiv.innerHTML=`<div class="comment-meta">${c.user} • ${fmtTime(c.ts)}</div><div class="comment-text"></div>`;
+    cdiv.querySelector(".comment-text").textContent=c.text;
+    if(state.isAdmin){
+      const cbtn=document.createElement("button");
+      cbtn.className="btn";
+      cbtn.textContent="Delete Comment";
+      cbtn.onclick=async()=>{
+        setStatus("");
+        const ok=await apiPost("admin_delete_comment",{token:state.token,postId:post.id,commentId:c.id});
+        if(!ok){setStatus("admin delete failed");return}
+        await fetchPost(post.id);
+      };
+      cdiv.appendChild(cbtn);
+    }
+    cwrap.appendChild(cdiv);
+  });
+  if(state.sessionUser){
+    const form=document.createElement("div");
+    form.className="comment";
+    const inp=document.createElement("input");
+    inp.className="input";
+    inp.placeholder="comment";
+    const btn=document.createElement("button");
+    btn.className="btn";
+    btn.textContent="Post Comment";
+    btn.onclick=async()=>{
+      const text=inp.value.trim();
+      if(!text)return;
+      setStatus("");
+      const ok=await apiPost("comment",{token:state.token,postId:post.id,text});
+      if(!ok){setStatus("comment failed");return}
+      await fetchPost(post.id);
+    };
+    form.append(inp,btn);
+    cwrap.appendChild(form);
+  }
+  body.appendChild(cwrap);
+  panel.append(head,body);
+  wrap.classList.remove("hidden");
+  wrap.appendChild(panel);
+}
+function renderList(){
+  const list=qs("#posts");
+  list.innerHTML="";
+  const sorted=[...state.posts].sort((a,b)=>b.ts-a.ts);
+  sorted.forEach(p=>{
+    const wrap=document.createElement("div");
+    wrap.className="post";
+    const head=document.createElement("div");
+    head.className="post-head";
+    const safeTitle=p.title||"(untitled)";
+    head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
+    const body=document.createElement("div");
+    body.className="post-body";
+    const media=document.createElement(p.type==="video"?"video":"img");
+    media.className="post-media";
+    media.src=p.url;
+    if(p.type==="video"){media.controls=true}
+    body.appendChild(media);
+    wrap.append(head,body);
+    list.appendChild(wrap);
+  });
+}
+async function fetchPosts(){
+  const data=await apiGet("posts");
+  state.posts=Array.isArray(data?.posts)?data.posts:[];
+  renderList();
+}
+async function fetchPost(id){
+  const data=await apiGet("post",{id});
+  state.post=data?.post||null;
+  renderPost();
+}
+async function init(){
+  loadState();
+  await refreshSession();
+  if(postId){
+    qs("#post-view").classList.remove("hidden");
+    qs("#post-list").classList.add("hidden");
+    await fetchPost(postId);
+  }else{
+    qs("#post-list").classList.remove("hidden");
+    qs("#post-view").classList.add("hidden");
+    await fetchPosts();
+  }
+}
+qs("#logout-btn").onclick=()=>{
+  setToken("");
+  state.sessionUser=null;
+  state.isAdmin=false;
+  renderAuth();
+};
+init();
+</script>
+</body></html>

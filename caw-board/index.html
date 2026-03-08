@@ -20,66 +20,57 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .btn:active{transform:translateY(1px)}
 .muted{color:#a7a7a7;font-size:11px}
 .warn{color:#ffb3b3;font-size:12px}
+#posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
 .post{background:#1e1e1e;border:2px solid #111;margin-bottom:12px}
 .post-head{background:#2f2f2f;padding:6px 10px;border-bottom:1px solid #111}
 .post-title{font-weight:700;color:#ffe3a3}
 .post-meta{font-size:11px;color:#bdbdbd}
 .post-body{padding:10px}
-.post-media{max-width:100%;border:1px solid #333;background:#000}
+.post-media{max-width:100%;border:1px solid #333;background:#000;display:block;width:100%;height:auto}
+.post-link{color:#ffe3a3;text-decoration:none}
+.post-link:hover{text-decoration:underline}
 .post-actions{margin-top:6px}
 .comment{background:#252525;border:1px solid #111;margin-top:6px;padding:6px}
 .comment-meta{font-size:11px;color:#bdbdbd}
 .comment-text{font-size:12px;color:#e8e8e8}
 .admin-tag{color:#ffcc66;font-weight:700}
 .hidden{display:none}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.topbar-links{display:flex;gap:8px;flex-wrap:wrap}
 </style></head>
 <body>
 <div id="page">
+  <div class="panel topbar">
+    <div class="board-title">Caw-board <span class="board-sub">/cb/ image + video board</span></div>
+    <div id="auth-logged-out" class="topbar-links">
+      <a class="btn" href="/login/">/login</a>
+      <a class="btn" href="/signup/">/signup</a>
+    </div>
+    <div id="auth-logged-in" class="topbar-links hidden">
+      <div class="label">Signed in as <span id="session-user"></span></div>
+      <button id="logout-btn" class="btn">Sign Out</button>
+    </div>
+  </div>
   <table class="board-frame" cellpadding="0" cellspacing="0">
-    <tr><td colspan="2">
-      <div class="board-title">Caw-board <span class="board-sub">/cb/ image + video board</span></div>
-    </td></tr>
     <tr>
       <td class="sidebar">
         <div class="panel">
-          <h3>Account</h3>
-          <div class="warn">Use a completely different password from your usual passwords.</div>
-          <div id="auth-logged-out">
-            <div class="label">/login</div>
-            <a class="btn" href="/login/">Go to /login</a>
-            <div class="label" style="margin-top:8px">/signup</div>
-            <a class="btn" href="/signup/">Go to /signup</a>
-            <div class="muted" style="margin-top:8px">Admin uses /login too.</div>
-          </div>
-          <div id="auth-logged-in" class="hidden">
-            <div class="label">Signed in as <span id="session-user"></span></div>
-            <button id="logout-btn" class="btn">Sign Out</button>
-          </div>
-        </div>
-        <div class="panel">
           <h3>Rules</h3>
           <div class="muted">no Porn buddy this is a meme image board send bullshit idk just dont make it porn looking at you GREG.</div>
+        </div>
+        <div id="admin-panel" class="panel hidden">
+          <h3>Admin</h3>
+          <button id="wipe-btn" class="btn">Wipe All Posts</button>
         </div>
       </td>
       <td class="main">
         <div class="panel">
           <h3>Create Post</h3>
           <div id="post-locked" class="muted">Sign in to post.</div>
-          <div id="post-form" class="hidden">
-            <div class="label">Title</div>
-            <input id="post-title" class="input" placeholder="title">
-            <div class="label" style="margin-top:6px">Media file</div>
-            <input id="post-file" class="input" type="file" accept="image/*,video/*">
-            <div class="label" style="margin-top:6px">Or media URL</div>
-            <input id="post-url" class="input" placeholder="https://...">
-            <div class="label" style="margin-top:6px">Type</div>
-            <select id="post-type" class="select">
-              <option value="image">Image</option>
-              <option value="video">Video</option>
-            </select>
-            <button id="post-btn" class="btn" style="margin-top:8px">Post</button>
-            <div id="status" class="muted" style="margin-top:6px"></div>
+          <div id="post-link" class="hidden">
+            <a class="btn" href="/post/new/">Create New Post</a>
           </div>
+          <div id="status" class="muted" style="margin-top:6px"></div>
         </div>
         <div id="posts"></div>
       </td>
@@ -125,7 +116,8 @@ function renderAuth(){
   qs("#auth-logged-in").classList.toggle("hidden",!loggedIn);
   qs("#session-user").textContent=state.sessionUser?`${state.sessionUser}${state.isAdmin?" (admin)":""}`:"";
   qs("#post-locked").classList.toggle("hidden",loggedIn);
-  qs("#post-form").classList.toggle("hidden",!loggedIn);
+  qs("#post-link").classList.toggle("hidden",!loggedIn);
+  qs("#admin-panel").classList.toggle("hidden",!state.isAdmin);
 }
 function renderPosts(){
   const postsEl=qs("#posts");
@@ -136,7 +128,8 @@ function renderPosts(){
     wrap.className="post";
     const head=document.createElement("div");
     head.className="post-head";
-    head.innerHTML=`<div class="post-title">${p.title||"(untitled)"}</div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
+    const safeTitle=p.title||"(untitled)";
+    head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
     const body=document.createElement("div");
     body.className="post-body";
     const media=document.createElement(p.type==="video"?"video":"img");
@@ -144,9 +137,27 @@ function renderPosts(){
     media.src=p.url;
     if(p.type==="video"){media.controls=true}
     body.appendChild(media);
-    if(isAdmin()){
-      const actions=document.createElement("div");
+    let actions=null;
+    const ensureActions=()=>{
+      if(actions)return actions;
+      actions=document.createElement("div");
       actions.className="post-actions";
+      body.appendChild(actions);
+      return actions;
+    };
+    if(state.sessionUser&&p.user===state.sessionUser){
+      const delOwn=document.createElement("button");
+      delOwn.className="btn";
+      delOwn.textContent="Delete My Post";
+      delOwn.onclick=async()=>{
+        setStatus("");
+        const ok=await apiPost("delete_post",{token:state.token,postId:p.id});
+        if(!ok){setStatus("delete failed");return}
+        await fetchPosts();
+      };
+      ensureActions().appendChild(delOwn);
+    }
+    if(isAdmin()){
       const del=document.createElement("button");
       del.className="btn";
       del.textContent="Delete Post";
@@ -156,8 +167,7 @@ function renderPosts(){
         if(!ok){setStatus("admin delete failed");return}
         await fetchPosts();
       };
-      actions.appendChild(del);
-      body.appendChild(actions);
+      ensureActions().appendChild(del);
     }
     const cwrap=document.createElement("div");
     p.comments.forEach(c=>{
@@ -211,35 +221,13 @@ function logout(){
   renderAuth();
   renderPosts();
 }
-async function postFromFile(file,type,title){
-  if(file.size>5*1024*1024){setStatus("file too big, use a URL");return}
-  const r=new FileReader();
-  r.onload=async()=>{
-    const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result});
-    if(!resp){setStatus("post failed");return}
-    qs("#post-file").value="";
-    qs("#post-url").value="";
-    qs("#post-title").value="";
-    await fetchPosts();
-  };
-  r.readAsDataURL(file);
-}
-async function postFromUrl(url,type,title){
-  const resp=await apiPost("create_post",{token:state.token,title,type,url});
-  if(!resp){setStatus("post failed");return}
-  qs("#post-url").value="";
-  qs("#post-title").value="";
-  await fetchPosts();
-}
-function postCreate(){
-  const title=qs("#post-title").value.trim();
-  const type=qs("#post-type").value;
-  const url=qs("#post-url").value.trim();
-  const file=qs("#post-file").files[0];
+async function adminWipe(){
+  if(!state.isAdmin)return;
+  if(!confirm("Wipe all posts?"))return;
   setStatus("");
-  if(file){postFromFile(file,type,title);return}
-  if(url){postFromUrl(url,type,title);return}
-  setStatus("add a file or url");
+  const ok=await apiPost("admin_wipe_posts",{token:state.token});
+  if(!ok){setStatus("wipe failed");return}
+  await fetchPosts();
 }
 async function fetchPosts(){
   const data=await apiGet("posts");
@@ -254,7 +242,7 @@ async function refreshSession(){
 }
 function wire(){
   qs("#logout-btn").onclick=logout;
-  qs("#post-btn").onclick=postCreate;
+  qs("#wipe-btn").onclick=adminWipe;
 }
 loadState();
 wire();

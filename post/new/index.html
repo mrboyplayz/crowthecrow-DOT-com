@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caw-board /post/new</title>
+<style>
+body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-serif}
+#page{max-width:560px;margin:40px auto 60px;padding:0 12px}
+.panel{background:#2a2a2a;border:2px inset #111;padding:12px;margin-bottom:10px}
+.panel h3{margin:0 0 10px 0;font-size:16px;color:#ffd17a}
+.label{font-size:12px;color:#bbb;margin-bottom:4px}
+.input,.select{width:100%;box-sizing:border-box;background:#111;color:#e6e6e6;border:1px solid #555;padding:6px;font-size:12px}
+.btn{background:linear-gradient(#5e5e5e,#3a3a3a);color:#fff;border:1px solid #222;padding:6px 10px;font-size:12px;cursor:pointer}
+.btn:active{transform:translateY(1px)}
+.muted{color:#a7a7a7;font-size:11px}
+.links{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.hidden{display:none}
+</style></head>
+<body>
+<div id="page">
+  <div class="panel">
+    <h3>/post/new</h3>
+    <div id="post-locked" class="muted">Sign in to post.</div>
+    <div id="post-form" class="hidden">
+      <div class="label">Title</div>
+      <input id="post-title" class="input" placeholder="title">
+      <div class="label" style="margin-top:6px">Media file</div>
+      <input id="post-file" class="input" type="file" accept="image/*,video/*">
+      <div class="label" style="margin-top:6px">Or media URL</div>
+      <input id="post-url" class="input" placeholder="https://...">
+      <div class="label" style="margin-top:6px">Type</div>
+      <select id="post-type" class="select">
+        <option value="image">Image</option>
+        <option value="video">Video</option>
+      </select>
+      <button id="post-btn" class="btn" style="margin-top:8px">Post</button>
+    </div>
+    <div id="status" class="muted" style="margin-top:6px"></div>
+    <div class="links">
+      <a class="btn" href="/login/">/login</a>
+      <a class="btn" href="/caw-board/">/caw-board</a>
+    </div>
+  </div>
+</div>
+<script>
+const qs=e=>document.querySelector(e);
+const LS=localStorage;
+const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
+const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
+const KEY="caw_session_token";
+const state={token:""};
+function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
+async function apiPost(action,body){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action",action);
+  const resp=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  if(!resp.ok)return null;
+  return resp.json();
+}
+function loadState(){
+  state.token=LS.getItem(KEY)||"";
+}
+async function refreshSession(){
+  if(!state.token){qs("#post-locked").classList.remove("hidden");return}
+  const data=await apiPost("session",{token:state.token});
+  if(!data||!data.user){LS.removeItem(KEY);qs("#post-locked").classList.remove("hidden");return}
+  qs("#post-locked").classList.add("hidden");
+  qs("#post-form").classList.remove("hidden");
+}
+async function postFromFile(file,type,title){
+  if(file.size>30*1024*1024){setStatus("file too big, use a URL");return}
+  const r=new FileReader();
+  r.onload=async()=>{
+    const resp=await apiPost("create_post",{token:state.token,title,type,url:r.result});
+    if(!resp||!resp.post){setStatus("post failed");return}
+    location.href=`/post/${encodeURIComponent(resp.post.id)}`;
+  };
+  r.readAsDataURL(file);
+}
+async function postFromUrl(url,type,title){
+  const resp=await apiPost("create_post",{token:state.token,title,type,url});
+  if(!resp||!resp.post){setStatus("post failed");return}
+  location.href=`/post/${encodeURIComponent(resp.post.id)}`;
+}
+function deriveTitle({title,file,url}){
+  if(title)return title;
+  if(file&&file.name){
+    const base=file.name.replace(/\.[^/.]+$/,"");
+    if(base)return base.slice(0,140);
+  }
+  if(url){
+    try{
+      const parsed=new URL(url);
+      const parts=parsed.pathname.split("/").filter(Boolean);
+      const last=parts.length?parts[parts.length-1]:parsed.hostname;
+      return decodeURIComponent(last||"post").slice(0,140);
+    }catch{
+      return "post";
+    }
+  }
+  return "post";
+}
+function postCreate(){
+  const rawTitle=qs("#post-title").value.trim();
+  const type=qs("#post-type").value;
+  const url=qs("#post-url").value.trim();
+  const file=qs("#post-file").files[0];
+  setStatus("");
+  const title=deriveTitle({title:rawTitle,file,url});
+  if(file){postFromFile(file,type,title);return}
+  if(url){postFromUrl(url,type,title);return}
+  setStatus("add a file or url");
+}
+qs("#post-btn").onclick=postCreate;
+loadState();
+refreshSession();
+</script>
+</body></html>

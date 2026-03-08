@@ -58,6 +58,17 @@ export default async function handler(req, res) {
     s = String(s || "").slice(0, 140);
     return s.replace(/[<>&]/g, "");
   }
+  function titleFromUrl(urlField) {
+    if (!urlField || urlField.startsWith("data:")) return "";
+    try {
+      const parsed = new URL(urlField);
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      const last = parts.length ? parts[parts.length - 1] : parsed.hostname;
+      return decodeURIComponent(last || "").slice(0, 140);
+    } catch {
+      return "";
+    }
+  }
   function cleanUser(s) {
     return String(s || "").trim().slice(0, 24).replace(/[^\w.-]/g, "");
   }
@@ -122,6 +133,21 @@ export default async function handler(req, res) {
     if (req.method === "GET" && action === "posts") {
       const posts = (await kvGet(POSTS_KEY, [])) || [];
       res.status(200).json({ posts: Array.isArray(posts) ? posts.slice(0, 200) : [] });
+      return;
+    }
+    if (req.method === "GET" && action === "post") {
+      const id = String(u.searchParams.get("id") || "");
+      if (!id) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const posts = (await kvGet(POSTS_KEY, [])) || [];
+      const post = Array.isArray(posts) ? posts.find(p => String(p.id) === id) : null;
+      if (!post) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.status(200).json({ post });
       return;
     }
     if (req.method === "GET" && action === "user_salt") {
@@ -222,12 +248,15 @@ export default async function handler(req, res) {
     }
     if (req.method === "POST" && action === "create_post") {
       const tokenValue = String(body?.token || "");
-      const title = cleanTitle(body?.title);
+      let title = cleanTitle(body?.title);
       const type = String(body?.type || "image") === "video" ? "video" : "image";
       const urlField = String(body?.url || "").trim();
       if (!tokenValue || !urlField) {
         res.status(400).json({ error: "bad_request" });
         return;
+      }
+      if (!title) {
+        title = cleanTitle(titleFromUrl(urlField) || "post");
       }
       const sessions = await loadSessions();
       const session = sessions[tokenValue];
@@ -236,7 +265,7 @@ export default async function handler(req, res) {
         return;
       }
       if (urlField.startsWith("data:")) {
-        if (urlField.length > 5 * 1024 * 1024) {
+        if (urlField.length > 40 * 1024 * 1024) {
           res.status(413).json({ error: "payload_too_large" });
           return;
         }
@@ -245,8 +274,10 @@ export default async function handler(req, res) {
         return;
       }
       const posts = (await kvGet(POSTS_KEY, [])) || [];
+      const numericIds = Array.isArray(posts) ? posts.map(p => parseInt(p.id, 10)).filter(n => Number.isFinite(n)) : [];
+      const nextId = numericIds.length ? Math.max(...numericIds) + 1 : 1;
       const post = {
-        id: makeId(),
+        id: String(nextId),
         user: session.user,
         title,
         type,
@@ -294,6 +325,38 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true });
       return;
     }
+    if (req.method === "POST" && action === "delete_post") {
+      const tokenValue = String(body?.token || "");
+      const postId = String(body?.postId || "");
+      if (!tokenValue || !postId) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const sessions = await loadSessions();
+      const session = sessions[tokenValue];
+      if (!session || !session.user) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      let posts = (await kvGet(POSTS_KEY, [])) || [];
+      const post = posts.find(p => p.id === postId);
+      if (!post) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      if (!session.admin && post.user !== session.user) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
+      posts = posts.filter(p => p.id !== postId);
+      const ok = await kvSet(POSTS_KEY, posts);
+      if (!ok) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true });
+      return;
+    }
     if (req.method === "POST" && action === "admin_delete_post") {
       const tokenValue = String(body?.token || "");
       if (!tokenValue) {
@@ -314,6 +377,26 @@ export default async function handler(req, res) {
       let posts = (await kvGet(POSTS_KEY, [])) || [];
       posts = posts.filter(p => p.id !== postId);
       const ok = await kvSet(POSTS_KEY, posts);
+      if (!ok) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true });
+      return;
+    }
+    if (req.method === "POST" && action === "admin_wipe_posts") {
+      const tokenValue = String(body?.token || "");
+      if (!tokenValue) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const sessions = await loadSessions();
+      const session = sessions[tokenValue];
+      if (!session || !session.admin) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const ok = await kvSet(POSTS_KEY, []);
       if (!ok) {
         res.status(500).json({ error: "kv_set_failed" });
         return;
