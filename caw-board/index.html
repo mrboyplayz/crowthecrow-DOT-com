@@ -194,9 +194,13 @@ function renderUsers(){
     const btn=document.createElement("button");
     btn.className="btn";
     btn.textContent="Terminate";
+    const ipBanBtn=document.createElement("button");
+    ipBanBtn.className="btn";
+    ipBanBtn.textContent="IP Ban";
     if(u.user===state.sessionUser){
       btn.disabled=true;
       btn.textContent="Current";
+      ipBanBtn.disabled=true;
     }
     btn.onclick=async()=>{
       if(btn.disabled)return;
@@ -209,7 +213,18 @@ function renderUsers(){
       await fetchPosts();
       setStatus(`terminated ${u.user}`);
     };
-    row.append(name,btn);
+    ipBanBtn.onclick=async()=>{
+      if(ipBanBtn.disabled)return;
+      if(!confirm(`IP ban ${u.user}?`))return;
+      setStatus("");
+      const resp=await apiPost("admin_ip_ban_user",{token:state.token,username:u.user});
+      if(!resp||!resp.ok){setStatus("ip ban failed");return}
+      state.users=state.users.filter(item=>item.user!==u.user);
+      renderUsers();
+      await fetchPosts();
+      setStatus(`ip banned ${u.user}`);
+    };
+    row.append(name,btn,ipBanBtn);
     listEl.appendChild(row);
   });
 }

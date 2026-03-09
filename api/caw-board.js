@@ -53,6 +53,8 @@ export default async function handler(req, res) {
   const USERS_KEY = "caw_users_v1";
   const POSTS_KEY = "caw_posts_v1";
   const SESSIONS_KEY = "caw_sessions_v1";
+  const BANNED_USERS_KEY = "caw_banned_users_v1";
+  const BANNED_IPS_KEY = "caw_banned_ips_v1";
   const MEDIA_KEY_PREFIX = "caw_media_v1:";
   const CAPTCHA_KEY_PREFIX = "caw_captcha_v1:";
   const CAPTCHA_QUIZ_KEY_PREFIX = "caw_captcha_quiz_v1:";
@@ -84,13 +86,13 @@ export default async function handler(req, res) {
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/juniorr.jpg", answers: ["junior", "bowser junior", "god"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jos.webp", answers: ["joseph"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/cody.jpg", answers: ["cody"] },
-    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/chefpay.webp", answers: ["chef pee pee", "chefpeepee", "chef penis"] },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/chefpay.webp", answers: ["chef pee pee", "chefpeepee", "chef peepee", "chef penis"] },
     { prompt: "Who is this ??? Character?", image: "/caw-content/FASHION.jpg", answers: ["fashion new year"] },
   ];
   const CAW_BOARD_CLOSED = false;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const action = u.searchParams.get("action") || "";
-  const closedAllowActions = new Set(["embed", "captcha", "quiz_start", "quiz_answer", "login", "session", "admin_wipe_non_admin", "admin_wipe_users_without_posts"]);
+  const closedAllowActions = new Set(["embed", "captcha", "quiz_start", "quiz_answer", "login", "session", "admin_wipe_non_admin", "admin_wipe_users_without_posts", "admin_ip_ban_user"]);
   if (CAW_BOARD_CLOSED) {
     if (req.method === "GET" && action === "embed") {
       res.status(503).setHeader("Content-Type", "text/html; charset=utf-8");
@@ -168,6 +170,93 @@ export default async function handler(req, res) {
   function adminNamesSet() {
     const names = [cleanUser(adminUser), cleanUser(adminUser2)].filter(Boolean);
     return new Set(names);
+  }
+  function normalizeModerationText(value) {
+    return String(value || "").toLowerCase();
+  }
+  function containsHardR(text) {
+    return /\bn[\W_]*i[\W_]*g[\W_]*g[\W_]*e[\W_]*r\b/i.test(text);
+  }
+  function containsDiscordInvite(text) {
+    return /(https?:\/\/)?(www\.)?(discord\.gg\/|discord\.com\/invite\/|discordapp\.com\/invite\/)[a-z0-9-]+/i.test(text);
+  }
+  function containsBannableContent(text) {
+    const value = normalizeModerationText(text);
+    if (!value) return false;
+    return containsHardR(value) || containsDiscordInvite(value);
+  }
+  async function loadStringSet(key) {
+    const raw = await kvGet(key, []);
+    const list = Array.isArray(raw) ? raw : [];
+    return new Set(list.map(v => String(v || "").trim()).filter(Boolean));
+  }
+  async function saveStringSet(key, setObj) {
+    return kvSet(key, Array.from(setObj));
+  }
+  async function isIpBanned(ip) {
+    const value = String(ip || "").trim();
+    if (!value) return false;
+    const bannedIps = await loadStringSet(BANNED_IPS_KEY);
+    return bannedIps.has(value);
+  }
+  async function isUserBanned(username) {
+    const value = cleanUser(username);
+    if (!value) return false;
+    const bannedUsers = await loadStringSet(BANNED_USERS_KEY);
+    return bannedUsers.has(value);
+  }
+  async function enforceBan(req, username) {
+    const ip = clientIpFromReq(req);
+    if (await isIpBanned(ip)) return { blocked: true, code: 403, error: "ip_banned" };
+    if (await isUserBanned(username)) return { blocked: true, code: 403, error: "account_banned" };
+    return { blocked: false };
+  }
+  async function applyAutomaticBan(req, username, options = {}) {
+    const targetUser = cleanUser(username);
+    if (!targetUser) return false;
+    const useRequestIp = options.useRequestIp !== false;
+    const users = (await kvGet(USERS_KEY, {})) || {};
+    const userRecord = users[targetUser];
+    const requestIp = clientIpFromReq(req);
+    const fallbackIp = String(userRecord?.signupIp || "").trim();
+    const ipsToBan = new Set();
+    if (fallbackIp) ipsToBan.add(fallbackIp);
+    if (useRequestIp && requestIp) ipsToBan.add(requestIp);
+    const bannedUsers = await loadStringSet(BANNED_USERS_KEY);
+    bannedUsers.add(targetUser);
+    const bannedIps = await loadStringSet(BANNED_IPS_KEY);
+    for (const value of ipsToBan) bannedIps.add(value);
+    delete users[targetUser];
+    const sessions = await loadSessions();
+    const nextSessions = {};
+    for (const [key, value] of Object.entries(sessions)) {
+      if (value && typeof value === "object" && String(value.user || "") === targetUser) continue;
+      nextSessions[key] = value;
+    }
+    const allPosts = (await kvGet(POSTS_KEY, [])) || [];
+    const nextPosts = [];
+    if (Array.isArray(allPosts)) {
+      for (const post of allPosts) {
+        if (String(post?.user || "") === targetUser) {
+          if (isStoredMedia(post?.url)) await kvDel(mediaKey(post.id));
+          continue;
+        }
+        post.comments = Array.isArray(post.comments) ? post.comments.filter(c => String(c?.user || "") !== targetUser) : [];
+        const votes = normalizeVotes(post.votes);
+        if (votes[targetUser]) delete votes[targetUser];
+        const counts = countVotes(votes);
+        post.votes = votes;
+        post.likes = counts.likes;
+        post.dislikes = counts.dislikes;
+        nextPosts.push(post);
+      }
+    }
+    const okUsers = await kvSet(USERS_KEY, users);
+    const okSessions = await kvSet(SESSIONS_KEY, nextSessions);
+    const okPosts = await kvSet(POSTS_KEY, nextPosts);
+    const okBannedUsers = await saveStringSet(BANNED_USERS_KEY, bannedUsers);
+    const okBannedIps = await saveStringSet(BANNED_IPS_KEY, bannedIps);
+    return !!(okUsers && okSessions && okPosts && okBannedUsers && okBannedIps);
   }
   function clientIpFromReq(req) {
     const forwarded = String(req.headers["x-forwarded-for"] || "").split(",").map(v => v.trim()).filter(Boolean);
@@ -510,6 +599,11 @@ export default async function handler(req, res) {
         res.status(400).json({ error: "bad_username" });
         return;
       }
+      const banned = await enforceBan(req, username);
+      if (banned.blocked) {
+        res.status(banned.code).json({ error: banned.error });
+        return;
+      }
       const users = (await kvGet(USERS_KEY, {})) || {};
       const user = users[username];
       if (!user) {
@@ -540,6 +634,11 @@ export default async function handler(req, res) {
       return;
     }
     if (req.method === "POST" && action === "signup") {
+      const bannedByIp = await enforceBan(req, "");
+      if (bannedByIp.blocked) {
+        res.status(bannedByIp.code).json({ error: bannedByIp.error });
+        return;
+      }
       const captcha = await verifyCaptcha();
       if (!captcha.ok) {
         res.status(captcha.code).json({ error: captcha.error });
@@ -549,6 +648,11 @@ export default async function handler(req, res) {
       const password = String(body?.password || "");
       if (!username || password.length < 6) {
         res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const bannedByUser = await enforceBan(req, username);
+      if (bannedByUser.blocked) {
+        res.status(bannedByUser.code).json({ error: bannedByUser.error });
         return;
       }
       if ((adminUser && tscmp(username, adminUser)) || (adminUser2 && tscmp(username, adminUser2))) {
@@ -584,6 +688,11 @@ export default async function handler(req, res) {
       return;
     }
     if (req.method === "POST" && action === "login") {
+      const bannedByIp = await enforceBan(req, "");
+      if (bannedByIp.blocked) {
+        res.status(bannedByIp.code).json({ error: bannedByIp.error });
+        return;
+      }
       const captcha = await verifyCaptcha();
       if (!captcha.ok) {
         res.status(captcha.code).json({ error: captcha.error });
@@ -593,6 +702,11 @@ export default async function handler(req, res) {
       const password = String(body?.password || "");
       if (!username || !password) {
         res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const bannedByUser = await enforceBan(req, username);
+      if (bannedByUser.blocked) {
+        res.status(bannedByUser.code).json({ error: bannedByUser.error });
         return;
       }
       if (
@@ -637,6 +751,13 @@ export default async function handler(req, res) {
         res.status(404).json({ error: "not_found" });
         return;
       }
+      const banned = await enforceBan(req, session.user);
+      if (banned.blocked) {
+        delete sessions[tokenValue];
+        await kvSet(SESSIONS_KEY, sessions);
+        res.status(banned.code).json({ error: banned.error });
+        return;
+      }
       res.status(200).json({ ok: true, user: session.user, admin: !!session.admin });
       return;
     }
@@ -662,6 +783,23 @@ export default async function handler(req, res) {
       const session = sessions[tokenValue];
       if (!session || !session.user) {
         res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const banned = await enforceBan(req, session.user);
+      if (banned.blocked) {
+        delete sessions[tokenValue];
+        await kvSet(SESSIONS_KEY, sessions);
+        res.status(banned.code).json({ error: banned.error });
+        return;
+      }
+      const rawTitle = String(body?.title || "");
+      if (containsBannableContent(rawTitle)) {
+        const okBan = await applyAutomaticBan(req, session.user);
+        if (!okBan) {
+          res.status(500).json({ error: "kv_set_failed" });
+          return;
+        }
+        res.status(403).json({ error: "account_banned" });
         return;
       }
       const isData = urlField.startsWith("data:");
@@ -730,6 +868,13 @@ export default async function handler(req, res) {
         res.status(401).json({ error: "unauthorized" });
         return;
       }
+      const banned = await enforceBan(req, session.user);
+      if (banned.blocked) {
+        delete sessions[tokenValue];
+        await kvSet(SESSIONS_KEY, sessions);
+        res.status(banned.code).json({ error: banned.error });
+        return;
+      }
       const posts = (await kvGet(POSTS_KEY, [])) || [];
       const post = Array.isArray(posts) ? posts.find(p => String(p.id) === postId) : null;
       if (!post) {
@@ -766,6 +911,22 @@ export default async function handler(req, res) {
       const session = sessions[tokenValue];
       if (!session || !session.user) {
         res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const banned = await enforceBan(req, session.user);
+      if (banned.blocked) {
+        delete sessions[tokenValue];
+        await kvSet(SESSIONS_KEY, sessions);
+        res.status(banned.code).json({ error: banned.error });
+        return;
+      }
+      if (containsBannableContent(text)) {
+        const okBan = await applyAutomaticBan(req, session.user);
+        if (!okBan) {
+          res.status(500).json({ error: "kv_set_failed" });
+          return;
+        }
+        res.status(403).json({ error: "account_banned" });
         return;
       }
       const posts = (await kvGet(POSTS_KEY, [])) || [];
@@ -1022,6 +1183,36 @@ export default async function handler(req, res) {
         return;
       }
       res.status(200).json({ ok: true, removedUsers: removedUsers.length, keptUsers: Object.keys(nextUsers).length });
+      return;
+    }
+    if (req.method === "POST" && action === "admin_ip_ban_user") {
+      const tokenValue = String(body?.token || "");
+      const username = cleanUser(body?.username);
+      if (!tokenValue || !username) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const sessions = await loadSessions();
+      const session = sessions[tokenValue];
+      if (!session || !session.admin) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      if (session.user && session.user === username) {
+        res.status(400).json({ error: "cannot_ban_self" });
+        return;
+      }
+      const users = (await kvGet(USERS_KEY, {})) || {};
+      if (!users[username]) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const okBan = await applyAutomaticBan(req, username, { useRequestIp: false });
+      if (!okBan) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, bannedUser: username });
       return;
     }
     if (req.method === "POST" && action === "admin_users") {
