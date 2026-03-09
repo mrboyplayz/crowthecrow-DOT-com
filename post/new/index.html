@@ -26,7 +26,7 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .preview-desc{font-size:12px;color:#e0e0e0;white-space:pre-wrap;margin-top:6px}
 .preview-media{max-width:100%;border:1px solid #3d3424;background:#000;display:block;width:100%;height:auto}
 .captcha-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:11900;display:flex;align-items:center;justify-content:center}
-.captcha-modal{width:min(760px,94vw);max-height:90vh;overflow:auto;background:#161616;border:2px solid #ffd17a;padding:14px}
+.captcha-modal{width:min(560px,94vw);max-height:90vh;overflow:auto;background:#161616;border:2px solid #ffd17a;padding:14px}
 .captcha-title{font-size:15px;color:#ffd17a;text-align:center;margin-bottom:8px}
 .captcha-image{max-width:min(360px,90%);display:block;margin:0 auto;border:1px solid #555;background:#000}
 .captcha-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
@@ -40,6 +40,7 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 <div id="page">
   <div class="panel">
     <h3>/post/new</h3>
+    <div class="muted" style="margin-bottom:8px">Rules: no Porn buddy this is a meme image board send bullshit idk just dont make it porn looking at you GREG.</div>
     <div id="post-locked" class="muted">Sign in to post.</div>
     <div id="post-form" class="hidden">
       <div class="label">Title</div>
@@ -258,7 +259,7 @@ function failAndBoot(){
   showCaptchaModal();
   const wrap=captchaModalContent();
   if(!wrap){location.href=FAIL_REDIRECT_URL;return}
-  wrap.innerHTML=`<video id="fail-video" src="${FAIL_VIDEO_URL}" autoplay controls playsinline style="width:100%;max-width:360px;display:block;margin-top:6px"></video>`;
+  wrap.innerHTML=`<video id="fail-video" src="${FAIL_VIDEO_URL}" autoplay controls playsinline style="width:100%;max-width:360px;display:block;margin:6px auto 0"></video>`;
   setStatus("wrong answer");
   const video=qs("#fail-video");
   const go=()=>{location.href=FAIL_REDIRECT_URL};

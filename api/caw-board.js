@@ -81,6 +81,24 @@ export default async function handler(req, res) {
       answers: ["September 23, 1932", "1932", "sep 23 1932"],
       choices: ["September 23, 1932", "September 23, 1923", "January 1, 1900", "December 10, 1945"]
     },
+    {
+      prompt: "What was the first episode that jeffy was in?",
+      image: "/caw-content/SMLLogo.webp",
+      answers: ["Mario The Babysitter", "Mario The Babysitter!"],
+      choices: ["Mario The Babysitter", "The Big Arch!", "Koopa's New Job", "Charleyyy and Friends"]
+    },
+    {
+      prompt: "Who was the first person to nuke Crow's ZCity?",
+      image: "/caw-content/pluvia.mp4",
+      answers: ["John Crust", "d1o_da"],
+      choices: ["John Crust", "kazoo", "grandpa", "kliv"]
+    },
+    {
+      prompt: "who is a pervert",
+      image: "/caw-content/pluvia.mp4",
+      answers: ["jon"],
+      choices: ["Freakpool", "jon"]
+    },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/marvin.jpg", answers: ["marvin", "mario"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/brokenguy.webp", answers: ["brooklyn guy", "brooklynguy", "brooklyn t guy"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/juniorr.jpg", answers: ["junior", "bowser junior", "god"] },
