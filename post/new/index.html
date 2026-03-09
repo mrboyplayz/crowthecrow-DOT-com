@@ -198,7 +198,7 @@ function showCaptchaModal(){
 }
 function hideCaptchaModal(){
   const overlay=qs("#captcha-overlay");
-  if(overlay)overlay.classList.add("hidden");
+  if(overlay)overlay.remove();
 }
 function captchaModalContent(){
   ensureCaptchaModal();
