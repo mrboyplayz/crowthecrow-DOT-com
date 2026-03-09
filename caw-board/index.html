@@ -4,29 +4,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Caw-board</title>
 <style>
-body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-serif}
+body{margin:0;background:linear-gradient(#232323,#151515);color:#e6e6e6;font-family:Tahoma,Arial,sans-serif}
+body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradient(45deg,rgba(255,255,255,.03) 0,rgba(255,255,255,.03) 2px,transparent 2px,transparent 6px);pointer-events:none}
 #page{max-width:1400px;margin:30px auto 60px;padding:0 12px}
-.board-frame{width:100%;border:3px ridge #4a4a4a;background:#222}
-.board-title{background:linear-gradient(#4b4b4b,#2c2c2c);padding:8px 12px;border-bottom:2px solid #111;font-size:20px;letter-spacing:.5px}
-.board-sub{font-size:12px;color:#c0c0c0}
-.sidebar{width:260px;vertical-align:top;background:#1f1f1f;border-right:2px solid #111;padding:12px}
+.board-frame{width:100%;border:3px ridge #6a5a3a;background:#1c1a18;box-shadow:0 0 0 1px #0c0c0c,0 2px 8px rgba(0,0,0,.5)}
+.board-title{background:linear-gradient(#6b5a3a,#3a2f1f);padding:8px 12px;border-bottom:2px solid #0f0d09;font-size:20px;letter-spacing:.5px;text-shadow:0 1px 0 #000}
+.board-sub{font-size:12px;color:#d3c7a6}
+.sidebar{width:260px;vertical-align:top;background:#1b1a18;border-right:2px solid #0f0d09;padding:12px}
 .main{vertical-align:top;padding:12px}
-.panel{background:#2a2a2a;border:2px inset #111;padding:8px;margin-bottom:10px}
-.panel h3{margin:0 0 6px 0;font-size:14px;color:#ffd17a}
+.panel{background:linear-gradient(#2f2b24,#201c16);border:2px ridge #5f5238;padding:8px;margin-bottom:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.panel h3{margin:0 0 6px 0;font-size:14px;color:#ffd17a;text-shadow:0 1px 0 #000}
 .label{font-size:12px;color:#bbb;margin-bottom:4px}
-.input, .textarea, .select{width:100%;box-sizing:border-box;background:#111;color:#e6e6e6;border:1px solid #555;padding:6px;font-size:12px}
+.input, .textarea, .select{width:100%;box-sizing:border-box;background:#0f0e0c;color:#e6e6e6;border:1px solid #6a5a3a;padding:6px;font-size:12px;box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
 .textarea{min-height:70px;resize:vertical}
-.btn{background:linear-gradient(#5e5e5e,#3a3a3a);color:#fff;border:1px solid #222;padding:6px 10px;font-size:12px;cursor:pointer}
+.btn{background:linear-gradient(#7a6a4a,#4b3b26);color:#fff;border:1px solid #1b140c;padding:6px 10px;font-size:12px;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 1px 0 rgba(0,0,0,.6)}
+.btn:hover{filter:brightness(1.08)}
 .btn:active{transform:translateY(1px)}
 .muted{color:#a7a7a7;font-size:11px}
 .warn{color:#ffb3b3;font-size:12px}
 #posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
-.post{background:#1e1e1e;border:2px solid #111;margin-bottom:12px}
-.post-head{background:#2f2f2f;padding:6px 10px;border-bottom:1px solid #111}
+.post{background:#1a1814;border:2px solid #0e0c09;margin-bottom:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.post-head{background:linear-gradient(#3a3328,#262018);padding:6px 10px;border-bottom:1px solid #0e0c09}
 .post-title{font-weight:700;color:#ffe3a3}
 .post-meta{font-size:11px;color:#bdbdbd}
 .post-body{padding:8px}
-.post-media{max-width:100%;border:1px solid #333;background:#000;display:block;width:100%;height:auto;max-height:220px;object-fit:cover}
+.post-media{max-width:100%;border:1px solid #3d3424;background:#000;display:block;width:100%;height:auto;max-height:220px;object-fit:cover}
 .post-link{color:#ffe3a3;text-decoration:none}
 .post-link:hover{text-decoration:underline}
 .post-actions{margin-top:6px}
@@ -34,7 +36,7 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .vote-btn{display:inline-flex;gap:4px;align-items:center}
 .vote-icon{font-size:14px;line-height:1}
 .vote-count{font-size:11px;color:#bdbdbd}
-.comment{background:#252525;border:1px solid #111;margin-top:6px;padding:6px}
+.comment{background:#221e18;border:1px solid #0f0d09;margin-top:6px;padding:6px}
 .comment-meta{font-size:11px;color:#bdbdbd}
 .comment-text{font-size:12px;color:#e8e8e8}
 .admin-tag{color:#ffcc66;font-weight:700}
@@ -50,7 +52,7 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 </style></head>
 <body>
 <div id="page">
-  <div class="panel topbar">
+  <div class="panel topbar"> 
     <div class="board-title">Caw-board <span class="board-sub">/cb/ image + video board</span></div>
     <div id="auth-logged-out" class="topbar-links">
       <a class="btn" href="/login/">/login</a>

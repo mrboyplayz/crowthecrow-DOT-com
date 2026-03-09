@@ -93,6 +93,10 @@ export default async function handler(req, res) {
     s = String(s || "").slice(0, 140);
     return s.replace(/[<>&]/g, "");
   }
+  function cleanDescription(s) {
+    s = String(s || "").trim().slice(0, 400);
+    return s.replace(/[<>&]/g, "");
+  }
   function titleFromUrl(urlField) {
     if (!urlField || urlField.startsWith("data:")) return "";
     try {
@@ -370,6 +374,7 @@ export default async function handler(req, res) {
     if (req.method === "POST" && action === "create_post") {
       const tokenValue = String(body?.token || "");
       let title = cleanTitle(body?.title);
+      const description = cleanDescription(body?.description);
       const type = String(body?.type || "image") === "video" ? "video" : "image";
       const urlField = String(body?.url || "").trim();
       if (!tokenValue || !urlField) {
@@ -401,6 +406,7 @@ export default async function handler(req, res) {
         id: String(nextId),
         user: session.user,
         title,
+        description,
         type,
         url: urlField,
         ts: now(),
