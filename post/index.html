@@ -410,8 +410,10 @@ async function fetchPosts(){
 }
 async function fetchPost(id){
   if(String(id)==="0"){
-    state.post={id:"0",title:"brooky",description:"",type:"video",url:"/caw-content/brooky.mp4",user:"system",ts:Date.now(),likes:0,dislikes:0,comments:[]};
-    renderPost();
+    state.post=null;
+    const wrap=qs("#post-view");
+    wrap.classList.remove("hidden");
+    wrap.innerHTML=`<video src="/caw-content/brooky.mp4" controls autoplay style="position:fixed;inset:0;width:100vw;height:100vh;object-fit:cover;background:#000;z-index:9999"></video>`;
     return;
   }
   const data=await apiGet("post",{id});
