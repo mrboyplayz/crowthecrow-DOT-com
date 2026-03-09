@@ -49,6 +49,7 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
         <option value="image">Image</option>
         <option value="video">Video</option>
       </select>
+      <div id="recaptcha-wrap" style="margin-top:8px"></div>
       <button id="post-btn" class="btn" style="margin-top:8px">Post</button>
     </div>
     <div id="status" class="muted" style="margin-top:6px"></div>
@@ -66,7 +67,7 @@ const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.c
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEY="caw_session_token";
 const CAW_BOARD_CLOSED=true;
-const state={token:"",previewTimer:0};
+const state={token:"",previewTimer:0,recaptchaEnabled:false,recaptchaSiteKey:"",recaptchaWidgetId:null,recaptchaScriptReady:false};
 const MAX_UPLOAD=4718592;
 const MEDIA_MAX_CHARS=900000;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
@@ -110,10 +111,55 @@ async function apiGet(action,params){
     return null;
   }
 }
+async function loadRecaptchaScript(){
+  if(state.recaptchaScriptReady)return true;
+  if(window.grecaptcha){state.recaptchaScriptReady=true;return true}
+  return new Promise(resolve=>{
+    const existing=document.querySelector('script[data-recaptcha="1"]');
+    if(existing){
+      existing.addEventListener("load",()=>{state.recaptchaScriptReady=!!window.grecaptcha;resolve(state.recaptchaScriptReady);},{once:true});
+      existing.addEventListener("error",()=>resolve(false),{once:true});
+      return;
+    }
+    const script=document.createElement("script");
+    script.src="https://www.google.com/recaptcha/api.js?render=explicit";
+    script.async=true;
+    script.defer=true;
+    script.dataset.recaptcha="1";
+    script.onload=()=>{state.recaptchaScriptReady=!!window.grecaptcha;resolve(state.recaptchaScriptReady)};
+    script.onerror=()=>resolve(false);
+    document.head.appendChild(script);
+  });
+}
+async function initRecaptcha(){
+  const cfg=await apiGet("recaptcha_config");
+  state.recaptchaEnabled=!!cfg?.enabled;
+  state.recaptchaSiteKey=String(cfg?.siteKey||"");
+  const wrap=qs("#recaptcha-wrap");
+  if(!state.recaptchaEnabled||!state.recaptchaSiteKey){
+    wrap.textContent="";
+    return;
+  }
+  const ready=await loadRecaptchaScript();
+  if(!ready){setStatus("captcha unavailable");return}
+  wrap.innerHTML='<div id="post-recaptcha"></div>';
+  state.recaptchaWidgetId=window.grecaptcha.render("post-recaptcha",{sitekey:state.recaptchaSiteKey});
+}
+function getRecaptchaToken(){
+  if(!state.recaptchaEnabled)return "";
+  if(!window.grecaptcha||state.recaptchaWidgetId==null)return "";
+  return String(window.grecaptcha.getResponse(state.recaptchaWidgetId)||"").trim();
+}
+function resetRecaptcha(){
+  if(!state.recaptchaEnabled)return;
+  if(!window.grecaptcha||state.recaptchaWidgetId==null)return;
+  window.grecaptcha.reset(state.recaptchaWidgetId);
+}
 function statusFromError(error){
   if(error==="payload_too_large")return "file too big for server upload, use URL";
   if(error==="kv_set_failed")return "post save failed (storage full, use URL)";
   if(error==="unauthorized")return "sign in to post";
+  if(error==="captcha_required"||error==="captcha_invalid"||error==="captcha_expired"||error==="captcha_verify_failed")return "captcha failed";
   return "post save failed";
 }
 function loadState(){
@@ -141,6 +187,8 @@ async function refreshSession(){
   }
 }
 async function postFromFile(file,type,title,description){
+  const recaptchaToken=getRecaptchaToken();
+  if(state.recaptchaEnabled&&!recaptchaToken){setStatus("captcha required");return}
   if(file.size>MAX_UPLOAD){setStatus("file too big for server upload, use URL");return}
   const estimatedChars=Math.ceil(file.size*4/3)+100;
   if(estimatedChars>MEDIA_MAX_CHARS){setStatus("file too big for server upload, use URL");return}
@@ -150,15 +198,17 @@ async function postFromFile(file,type,title,description){
   const dataUrl=await fileToDataUrl(uploadFile);
   if(!dataUrl){setStatus("file read failed");hideProgress();return}
   setStatus("saving...");
-  const resp=await apiPost("create_post",{token:state.token,title,description,type,url:dataUrl},45000);
+  const resp=await apiPost("create_post",{token:state.token,title,description,type,url:dataUrl,recaptchaToken},45000);
   const postId=resp?.post?.id||resp?.id||"";
-  if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));hideProgress();return}
+  if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));hideProgress();resetRecaptcha();return}
   location.href=`/post/?id=${encodeURIComponent(postId)}`;
 }
 async function postFromUrl(url,type,title,description){
-  const resp=await apiPost("create_post",{token:state.token,title,description,type,url});
+  const recaptchaToken=getRecaptchaToken();
+  if(state.recaptchaEnabled&&!recaptchaToken){setStatus("captcha required");return}
+  const resp=await apiPost("create_post",{token:state.token,title,description,type,url,recaptchaToken});
   const postId=resp?.post?.id||resp?.id||"";
-  if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));return}
+  if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));resetRecaptcha();return}
   location.href=`/post/?id=${encodeURIComponent(postId)}`;
 }
 function deriveTitle({title,file,url}){
@@ -265,6 +315,7 @@ if(CAW_BOARD_CLOSED){
 }else{
   loadState();
   refreshSession();
+  initRecaptcha();
 }
 </script>
 </body></html>

@@ -27,6 +27,7 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
     <input id="signup-pass" class="input" type="password" placeholder="password">
     <div class="label" style="margin-top:8px">Confirm password</div>
     <input id="signup-pass2" class="input" type="password" placeholder="confirm password">
+    <div id="recaptcha-wrap" style="margin-top:10px"></div>
     <button id="signup-btn" class="btn" style="margin-top:10px">Create Account</button>
     <div id="status" class="muted" style="margin-top:8px"></div>
     <div class="links">
@@ -41,25 +42,84 @@ const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEY="caw_session_token";
+const recaptchaState={enabled:false,siteKey:"",widgetId:null,scriptReady:false};
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 async function apiPost(action,body){
   const url=new URL(apiUrl,location.origin);
   url.searchParams.set("action",action);
   const resp=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  const data=await resp.json().catch(()=>null);
+  if(!resp.ok)return data||{error:"http_error"};
+  return data;
+}
+async function apiGet(action,params){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action",action);
+  if(params)Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+  const resp=await fetch(url);
   if(!resp.ok)return null;
   return resp.json();
 }
 function setToken(token){
   if(token)LS.setItem(KEY,token);else LS.removeItem(KEY);
 }
+function signupError(error){
+  if(error==="captcha_required"||error==="captcha_invalid"||error==="captcha_expired"||error==="captcha_verify_failed")return "captcha failed";
+  return "signup failed";
+}
+async function loadRecaptchaScript(){
+  if(recaptchaState.scriptReady)return true;
+  if(window.grecaptcha){recaptchaState.scriptReady=true;return true}
+  return new Promise(resolve=>{
+    const existing=document.querySelector('script[data-recaptcha="1"]');
+    if(existing){
+      existing.addEventListener("load",()=>{recaptchaState.scriptReady=!!window.grecaptcha;resolve(recaptchaState.scriptReady);},{once:true});
+      existing.addEventListener("error",()=>resolve(false),{once:true});
+      return;
+    }
+    const script=document.createElement("script");
+    script.src="https://www.google.com/recaptcha/api.js?render=explicit";
+    script.async=true;
+    script.defer=true;
+    script.dataset.recaptcha="1";
+    script.onload=()=>{recaptchaState.scriptReady=!!window.grecaptcha;resolve(recaptchaState.scriptReady)};
+    script.onerror=()=>resolve(false);
+    document.head.appendChild(script);
+  });
+}
+async function initRecaptcha(){
+  const cfg=await apiGet("recaptcha_config");
+  recaptchaState.enabled=!!cfg?.enabled;
+  recaptchaState.siteKey=String(cfg?.siteKey||"");
+  const wrap=qs("#recaptcha-wrap");
+  if(!recaptchaState.enabled||!recaptchaState.siteKey){
+    wrap.textContent="";
+    return;
+  }
+  const ready=await loadRecaptchaScript();
+  if(!ready){setStatus("captcha unavailable");return}
+  wrap.innerHTML='<div id="signup-recaptcha"></div>';
+  recaptchaState.widgetId=window.grecaptcha.render("signup-recaptcha",{sitekey:recaptchaState.siteKey});
+}
+function getRecaptchaToken(){
+  if(!recaptchaState.enabled)return "";
+  if(!window.grecaptcha||recaptchaState.widgetId==null)return "";
+  return String(window.grecaptcha.getResponse(recaptchaState.widgetId)||"").trim();
+}
+function resetRecaptcha(){
+  if(!recaptchaState.enabled)return;
+  if(!window.grecaptcha||recaptchaState.widgetId==null)return;
+  window.grecaptcha.reset(recaptchaState.widgetId);
+}
 async function signup(){
   const u=qs("#signup-user").value.trim();
   const p=qs("#signup-pass").value;
   const p2=qs("#signup-pass2").value;
-  if(!u||!p||p!==p2||u.length<3||p.length<6){setStatus("invalid signup");return}
+  const recaptchaToken=getRecaptchaToken();
+  if(!u||!p||p!==p2||u.length<3||p.length<6||(recaptchaState.enabled&&!recaptchaToken)){setStatus("invalid signup");return}
   setStatus("");
-  const resp=await apiPost("signup",{username:u,password:p});
-  if(!resp||!resp.token){setStatus("signup failed");return}
+  const resp=await apiPost("signup",{username:u,password:p,recaptchaToken});
+  if(!resp||!resp.token){setStatus(signupError(resp?.error));resetRecaptcha();return}
   setToken(resp.token);
   location.href="/caw-board/";
 }
@@ -71,5 +131,6 @@ async function refreshSession(){
 }
 qs("#signup-btn").onclick=signup;
 refreshSession();
+initRecaptcha();
 </script>
 </body></html>

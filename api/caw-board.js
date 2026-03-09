@@ -12,6 +12,8 @@ export default async function handler(req, res) {
   const adminUser = process.env.CAW_ADMIN_USERNAME || "";
   const adminPass2 = process.env.ADMIN_CAW_BOARD_PASSWORD || "";
   const adminUser2 = process.env.ADMIN_CAW_BOARD_USERNAME || "";
+  const recaptchaSiteKey = process.env.RECAPTCHA_SITE_KEY || "";
+  const recaptchaSecretKey = process.env.RECAPTCHA_SECRET_KEY || "";
   const encoder = new TextEncoder();
   function escapeHtml(value) {
     return String(value || "")
@@ -54,12 +56,14 @@ export default async function handler(req, res) {
   const POSTS_KEY = "caw_posts_v1";
   const SESSIONS_KEY = "caw_sessions_v1";
   const MEDIA_KEY_PREFIX = "caw_media_v1:";
+  const CAPTCHA_KEY_PREFIX = "caw_captcha_v1:";
   const MEDIA_MAX_CHARS = 900000;
   const MAX_ACCOUNTS_PER_IP = 3;
+  const CAPTCHA_TTL_MS = 5 * 60 * 1000;
   const CAW_BOARD_CLOSED = true;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const action = u.searchParams.get("action") || "";
-  const closedAllowActions = new Set(["embed", "login", "session", "admin_wipe_non_admin"]);
+  const closedAllowActions = new Set(["embed", "captcha", "recaptcha_config", "login", "session", "admin_wipe_non_admin"]);
   if (CAW_BOARD_CLOSED) {
     if (req.method === "GET" && action === "embed") {
       res.status(503).setHeader("Content-Type", "text/html; charset=utf-8");
@@ -152,8 +156,36 @@ export default async function handler(req, res) {
   function mediaKey(id) {
     return `${MEDIA_KEY_PREFIX}${id}`;
   }
+  function captchaKey(id) {
+    return `${CAPTCHA_KEY_PREFIX}${id}`;
+  }
   function isStoredMedia(urlField) {
     return String(urlField || "").startsWith("kv:");
+  }
+  function cleanCaptchaAnswer(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
+  }
+  async function verifyRecaptchaToken(value, req) {
+    const tokenValue = String(value || "").trim();
+    if (!tokenValue) return { ok: false, error: "captcha_required", code: 400 };
+    const params = new URLSearchParams();
+    params.set("secret", recaptchaSecretKey);
+    params.set("response", tokenValue);
+    const ip = clientIpFromReq(req);
+    if (ip) params.set("remoteip", ip);
+    try {
+      const resp = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString()
+      });
+      if (!resp.ok) return { ok: false, error: "captcha_verify_failed", code: 500 };
+      const data = await resp.json();
+      if (!data?.success) return { ok: false, error: "captcha_invalid", code: 400 };
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "captcha_verify_failed", code: 500 };
+    }
   }
   function makeId() {
     if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
@@ -238,6 +270,27 @@ export default async function handler(req, res) {
     return next;
   }
   try {
+    if (req.method === "GET" && action === "captcha") {
+      const a = 1 + Math.floor(Math.random() * 9);
+      const b = 1 + Math.floor(Math.random() * 9);
+      const captchaId = makeId();
+      const answer = cleanCaptchaAnswer(String(a + b));
+      const ok = await kvSet(captchaKey(captchaId), { answer, ts: now() });
+      if (!ok) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, captchaId, prompt: `${a} + ${b} = ?` });
+      return;
+    }
+    if (req.method === "GET" && action === "recaptcha_config") {
+      res.status(200).json({
+        ok: true,
+        enabled: !!(recaptchaSiteKey && recaptchaSecretKey),
+        siteKey: recaptchaSiteKey || ""
+      });
+      return;
+    }
     if (req.method === "GET" && action === "posts") {
       const posts = (await kvGet(POSTS_KEY, [])) || [];
       const baseUrl = baseUrlFromReq(req);
@@ -342,7 +395,28 @@ export default async function handler(req, res) {
       return;
     }
     const body = await readBody();
+    async function verifyCaptcha() {
+      if (recaptchaSiteKey && recaptchaSecretKey) {
+        return verifyRecaptchaToken(body?.recaptchaToken, req);
+      }
+      const captchaId = String(body?.captchaId || "");
+      const captchaAnswer = cleanCaptchaAnswer(body?.captchaAnswer || "");
+      if (!captchaId || !captchaAnswer) return { ok: false, error: "captcha_required", code: 400 };
+      const key = captchaKey(captchaId);
+      const stored = await kvGet(key, null);
+      await kvDel(key);
+      if (!stored || typeof stored !== "object") return { ok: false, error: "captcha_invalid", code: 400 };
+      const age = now() - Number(stored.ts || 0);
+      if (!Number.isFinite(age) || age > CAPTCHA_TTL_MS) return { ok: false, error: "captcha_expired", code: 400 };
+      if (!tscmp(captchaAnswer, cleanCaptchaAnswer(stored.answer || ""))) return { ok: false, error: "captcha_invalid", code: 400 };
+      return { ok: true };
+    }
     if (req.method === "POST" && action === "signup") {
+      const captcha = await verifyCaptcha();
+      if (!captcha.ok) {
+        res.status(captcha.code).json({ error: captcha.error });
+        return;
+      }
       const username = cleanUser(body?.username);
       const password = String(body?.password || "");
       if (!username || password.length < 6) {
@@ -382,6 +456,11 @@ export default async function handler(req, res) {
       return;
     }
     if (req.method === "POST" && action === "login") {
+      const captcha = await verifyCaptcha();
+      if (!captcha.ok) {
+        res.status(captcha.code).json({ error: captcha.error });
+        return;
+      }
       const username = cleanUser(body?.username);
       const password = String(body?.password || "");
       if (!username || !password) {
@@ -434,6 +513,11 @@ export default async function handler(req, res) {
       return;
     }
     if (req.method === "POST" && action === "create_post") {
+      const captcha = await verifyCaptcha();
+      if (!captcha.ok) {
+        res.status(captcha.code).json({ error: captcha.error });
+        return;
+      }
       const tokenValue = String(body?.token || "");
       let title = cleanTitle(body?.title);
       const description = cleanDescription(body?.description);
