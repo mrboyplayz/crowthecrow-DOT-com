@@ -49,6 +49,11 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .hidden{display:none}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
 .topbar-links{display:flex;gap:8px;flex-wrap:wrap}
+.loading-overlay{position:fixed;inset:0;background:rgba(10,10,10,.78);display:flex;align-items:center;justify-content:center;z-index:12000}
+.loading-box{display:flex;align-items:center;gap:12px;background:linear-gradient(#2f2b24,#201c16);border:2px ridge #5f5238;padding:14px 18px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.loading-spin{width:56px;height:56px;animation:spin 1.05s linear infinite;image-rendering:auto}
+.loading-text{font-size:20px;color:#ffd17a;letter-spacing:.8px;text-shadow:0 1px 0 #000;min-width:140px}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 </style></head>
 <body>
 <div id="page">
@@ -94,6 +99,12 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
     </tr>
   </table>
 </div>
+<div id="loading-overlay" class="loading-overlay">
+  <div class="loading-box">
+    <img class="loading-spin" src="/pluv/pluv.png" alt="loading">
+    <div id="loading-text" class="loading-text">LOADING.</div>
+  </div>
+</div>
 <script>
 const qs=e=>document.querySelector(e);
 const LS=localStorage;
@@ -103,6 +114,7 @@ const KEYS={token:"caw_session_token"};
 const CAW_BOARD_CLOSED=false;
 const state={posts:[],users:[],sessionUser:null,token:"",isAdmin:false,page:1};
 const PAGE_SIZE=24;
+let loadingTimer=0;
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
 function mediaTag(post){
   const mime=String(post?.mime||"").toLowerCase();
@@ -111,6 +123,24 @@ function mediaTag(post){
   return post?.type==="video"?"video":"img";
 }
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
+function showLoading(){
+  const overlay=qs("#loading-overlay");
+  const textEl=qs("#loading-text");
+  if(!overlay||!textEl)return;
+  overlay.classList.remove("hidden");
+  let step=0;
+  textEl.textContent="LOADING.";
+  if(loadingTimer)clearInterval(loadingTimer);
+  loadingTimer=setInterval(()=>{
+    step=(step+1)%3;
+    textEl.textContent=`LOADING${".".repeat(step+1)}`;
+  },420);
+}
+function hideLoading(){
+  if(loadingTimer){clearInterval(loadingTimer);loadingTimer=0;}
+  const overlay=qs("#loading-overlay");
+  if(overlay)overlay.classList.add("hidden");
+}
 async function apiGet(action,params){
   const url=new URL(apiUrl,location.origin);
   url.searchParams.set("action",action);
@@ -393,7 +423,11 @@ if(CAW_BOARD_CLOSED){
 }else{
   loadState();
   wire();
-  refreshSession().then(fetchPosts);
+  showLoading();
+  Promise.resolve()
+    .then(refreshSession)
+    .then(fetchPosts)
+    .finally(hideLoading);
 }
 </script>
 </body></html>
