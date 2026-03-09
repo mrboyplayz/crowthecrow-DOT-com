@@ -10,6 +10,8 @@ export default async function handler(req, res) {
   const token = process.env.KV_REST_API_TOKEN;
   const adminPass = process.env.CAW_ADMIN_PASSWORD || "";
   const adminUser = process.env.CAW_ADMIN_USERNAME || "";
+  const adminPass2 = process.env.ADMIN_CAW_BOARD_PASSWORD || "";
+  const adminUser2 = process.env.ADMIN_CAW_BOARD_USERNAME || "";
   const encoder = new TextEncoder();
   function escapeHtml(value) {
     return String(value || "")
@@ -263,7 +265,7 @@ export default async function handler(req, res) {
         res.status(400).json({ error: "bad_request" });
         return;
       }
-      if (adminUser && tscmp(username, adminUser)) {
+      if ((adminUser && tscmp(username, adminUser)) || (adminUser2 && tscmp(username, adminUser2))) {
         res.status(403).json({ error: "reserved_username" });
         return;
       }
@@ -294,7 +296,10 @@ export default async function handler(req, res) {
         res.status(400).json({ error: "bad_request" });
         return;
       }
-      if (adminUser && adminPass && tscmp(username, adminUser) && tscmp(password, adminPass)) {
+      if (
+        (adminUser && adminPass && tscmp(username, adminUser) && tscmp(password, adminPass)) ||
+        (adminUser2 && adminPass2 && tscmp(username, adminUser2) && tscmp(password, adminPass2))
+      ) {
         const sessions = await loadSessions();
         const sessionToken = makeId();
         sessions[sessionToken] = { user: username, admin: true };
