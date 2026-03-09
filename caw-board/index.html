@@ -30,6 +30,10 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .post-link{color:#ffe3a3;text-decoration:none}
 .post-link:hover{text-decoration:underline}
 .post-actions{margin-top:6px}
+.vote-bar{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
+.vote-btn{display:inline-flex;gap:4px;align-items:center}
+.vote-icon{width:16px;height:16px;display:inline-block}
+.vote-count{font-size:11px;color:#bdbdbd}
 .comment{background:#252525;border:1px solid #111;margin-top:6px;padding:6px}
 .comment-meta{font-size:11px;color:#bdbdbd}
 .comment-text{font-size:12px;color:#e8e8e8}
@@ -222,6 +226,34 @@ function renderPosts(){
       };
       ensureActions().appendChild(del);
     }
+    const votes=document.createElement("div");
+    votes.className="vote-bar";
+    const likeBtn=document.createElement("button");
+    likeBtn.className="btn vote-btn";
+    likeBtn.innerHTML=`<svg class="vote-icon" viewBox="0 0 56 952"><use href="/cawcontent/cool.svg#like-gray"></use></svg><span class="vote-count">${Number(p.likes||0)}</span>`;
+    likeBtn.onclick=async()=>{
+      if(!state.token){setStatus("sign in to vote");return}
+      const resp=await apiPost("vote",{token:state.token,postId:p.id,value:1});
+      if(!resp||!resp.ok){setStatus("vote failed");return}
+      p.likes=Number(resp.likes||0);
+      p.dislikes=Number(resp.dislikes||0);
+      likeBtn.querySelector(".vote-count").textContent=String(p.likes);
+      dislikeBtn.querySelector(".vote-count").textContent=String(p.dislikes);
+    };
+    const dislikeBtn=document.createElement("button");
+    dislikeBtn.className="btn vote-btn";
+    dislikeBtn.innerHTML=`<svg class="vote-icon" viewBox="0 0 56 952"><use href="/cawcontent/cool.svg#dislike-gray"></use></svg><span class="vote-count">${Number(p.dislikes||0)}</span>`;
+    dislikeBtn.onclick=async()=>{
+      if(!state.token){setStatus("sign in to vote");return}
+      const resp=await apiPost("vote",{token:state.token,postId:p.id,value:-1});
+      if(!resp||!resp.ok){setStatus("vote failed");return}
+      p.likes=Number(resp.likes||0);
+      p.dislikes=Number(resp.dislikes||0);
+      likeBtn.querySelector(".vote-count").textContent=String(p.likes);
+      dislikeBtn.querySelector(".vote-count").textContent=String(p.dislikes);
+    };
+    votes.append(likeBtn,dislikeBtn);
+    body.appendChild(votes);
     wrap.append(head,body);
     postsEl.appendChild(wrap);
   });

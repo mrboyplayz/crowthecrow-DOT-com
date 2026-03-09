@@ -164,10 +164,36 @@ export default async function handler(req, res) {
     const sessions = (await kvGet(SESSIONS_KEY, {})) || {};
     return normalizeSessions(sessions);
   }
+  function normalizeVotes(votes) {
+    if (!votes || typeof votes !== "object" || Array.isArray(votes)) return {};
+    const next = {};
+    for (const [key, value] of Object.entries(votes)) {
+      if (value === 1 || value === -1) next[key] = value;
+    }
+    return next;
+  }
+  function countVotes(votes) {
+    let likes = 0;
+    let dislikes = 0;
+    for (const value of Object.values(votes || {})) {
+      if (value === 1) likes++;
+      if (value === -1) dislikes++;
+    }
+    return { likes, dislikes };
+  }
+  function normalizePost(post) {
+    if (!post || typeof post !== "object") return post;
+    const votes = normalizeVotes(post.votes);
+    const counts = countVotes(votes);
+    const next = { ...post, likes: counts.likes, dislikes: counts.dislikes };
+    delete next.votes;
+    return next;
+  }
   try {
     if (req.method === "GET" && action === "posts") {
       const posts = (await kvGet(POSTS_KEY, [])) || [];
-      res.status(200).json({ posts: Array.isArray(posts) ? posts.slice(0, 200) : [] });
+      const list = Array.isArray(posts) ? posts.slice(0, 200).map(normalizePost) : [];
+      res.status(200).json({ posts: list });
       return;
     }
     if (req.method === "GET" && action === "post") {
@@ -182,7 +208,7 @@ export default async function handler(req, res) {
         res.status(404).json({ error: "not_found" });
         return;
       }
-      res.status(200).json({ post });
+      res.status(200).json({ post: normalizePost(post) });
       return;
     }
     if (req.method === "GET" && action === "embed") {
@@ -378,7 +404,10 @@ export default async function handler(req, res) {
         type,
         url: urlField,
         ts: now(),
-        comments: []
+        comments: [],
+        votes: {},
+        likes: 0,
+        dislikes: 0
       };
       posts.unshift(post);
       const ok = await kvSet(POSTS_KEY, posts.slice(0, 300));
@@ -387,6 +416,44 @@ export default async function handler(req, res) {
         return;
       }
       res.status(200).json({ ok: true, post });
+      return;
+    }
+    if (req.method === "POST" && action === "vote") {
+      const tokenValue = String(body?.token || "");
+      const postId = String(body?.postId || "");
+      const value = Number(body?.value || 0);
+      if (!tokenValue || !postId || ![1, -1, 0].includes(value)) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const sessions = await loadSessions();
+      const session = sessions[tokenValue];
+      if (!session || !session.user) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const posts = (await kvGet(POSTS_KEY, [])) || [];
+      const post = Array.isArray(posts) ? posts.find(p => String(p.id) === postId) : null;
+      if (!post) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const votes = normalizeVotes(post.votes);
+      if (value === 0) {
+        delete votes[session.user];
+      } else {
+        votes[session.user] = value;
+      }
+      const counts = countVotes(votes);
+      post.votes = votes;
+      post.likes = counts.likes;
+      post.dislikes = counts.dislikes;
+      const ok = await kvSet(POSTS_KEY, posts);
+      if (!ok) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, likes: post.likes, dislikes: post.dislikes, vote: value });
       return;
     }
     if (req.method === "POST" && action === "comment") {
@@ -553,6 +620,12 @@ export default async function handler(req, res) {
       posts.forEach(p => {
         if (!Array.isArray(p.comments)) return;
         p.comments = p.comments.filter(c => c.user !== username);
+        const votes = normalizeVotes(p.votes);
+        if (votes[username]) delete votes[username];
+        const counts = countVotes(votes);
+        p.votes = votes;
+        p.likes = counts.likes;
+        p.dislikes = counts.dislikes;
       });
       const okUsers = await kvSet(USERS_KEY, users);
       const okSessions = await kvSet(SESSIONS_KEY, nextSessions);

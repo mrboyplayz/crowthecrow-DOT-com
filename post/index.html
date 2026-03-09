@@ -26,9 +26,14 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .post-meta{font-size:11px;color:#bdbdbd}
 .post-body{padding:10px}
 .post-media{max-width:100%;border:1px solid #333;background:#000;display:block;width:100%;height:auto}
+#post-view .post-media{width:auto;max-height:70vh;object-fit:contain;margin:0 auto}
 .post-link{color:#ffe3a3;text-decoration:none}
 .post-link:hover{text-decoration:underline}
 .post-actions{margin-top:6px}
+.vote-bar{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
+.vote-btn{display:inline-flex;gap:4px;align-items:center}
+.vote-icon{width:16px;height:16px;display:inline-block}
+.vote-count{font-size:11px;color:#bdbdbd}
 .comment{background:#252525;border:1px solid #111;margin-top:6px;padding:6px}
 .comment-meta{font-size:11px;color:#bdbdbd}
 .comment-text{font-size:12px;color:#e8e8e8}
@@ -177,6 +182,34 @@ function renderPost(){
     };
     ensureActions().appendChild(del);
   }
+  const votes=document.createElement("div");
+  votes.className="vote-bar";
+  const likeBtn=document.createElement("button");
+  likeBtn.className="btn vote-btn";
+  likeBtn.innerHTML=`<svg class="vote-icon" viewBox="0 0 56 952"><use href="/cawcontent/cool.svg#like-gray"></use></svg><span class="vote-count">${Number(post.likes||0)}</span>`;
+  likeBtn.onclick=async()=>{
+    if(!state.token){setStatus("sign in to vote");return}
+    const resp=await apiPost("vote",{token:state.token,postId:post.id,value:1});
+    if(!resp||!resp.ok){setStatus("vote failed");return}
+    post.likes=Number(resp.likes||0);
+    post.dislikes=Number(resp.dislikes||0);
+    likeBtn.querySelector(".vote-count").textContent=String(post.likes);
+    dislikeBtn.querySelector(".vote-count").textContent=String(post.dislikes);
+  };
+  const dislikeBtn=document.createElement("button");
+  dislikeBtn.className="btn vote-btn";
+  dislikeBtn.innerHTML=`<svg class="vote-icon" viewBox="0 0 56 952"><use href="/cawcontent/cool.svg#dislike-gray"></use></svg><span class="vote-count">${Number(post.dislikes||0)}</span>`;
+  dislikeBtn.onclick=async()=>{
+    if(!state.token){setStatus("sign in to vote");return}
+    const resp=await apiPost("vote",{token:state.token,postId:post.id,value:-1});
+    if(!resp||!resp.ok){setStatus("vote failed");return}
+    post.likes=Number(resp.likes||0);
+    post.dislikes=Number(resp.dislikes||0);
+    likeBtn.querySelector(".vote-count").textContent=String(post.likes);
+    dislikeBtn.querySelector(".vote-count").textContent=String(post.dislikes);
+  };
+  votes.append(likeBtn,dislikeBtn);
+  body.appendChild(votes);
   const embed=document.createElement("button");
   embed.className="btn";
   embed.textContent="Copy Post Link";
@@ -255,6 +288,10 @@ function renderList(){
     media.src=p.url;
     if(p.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
     body.appendChild(media);
+    const votes=document.createElement("div");
+    votes.className="vote-bar";
+    votes.innerHTML=`<span class="vote-btn"><svg class="vote-icon" viewBox="0 0 56 952"><use href="/cawcontent/cool.svg#like-gray"></use></svg><span class="vote-count">${Number(p.likes||0)}</span></span><span class="vote-btn"><svg class="vote-icon" viewBox="0 0 56 952"><use href="/cawcontent/cool.svg#dislike-gray"></use></svg><span class="vote-count">${Number(p.dislikes||0)}</span></span>`;
+    body.appendChild(votes);
     wrap.append(head,body);
     list.appendChild(wrap);
   });
