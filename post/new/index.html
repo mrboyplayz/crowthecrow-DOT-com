@@ -20,6 +20,11 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .progress{width:100%;height:10px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row .select,.row .input{flex:1}
+.preview{margin-top:8px;background:#1a1814;border:1px solid #0e0c09;padding:8px}
+.preview-title{font-weight:700;color:#ffe3a3;margin-bottom:4px}
+.preview-meta{font-size:11px;color:#bdbdbd;margin-bottom:6px}
+.preview-desc{font-size:12px;color:#e0e0e0;white-space:pre-wrap;margin-top:6px}
+.preview-media{max-width:100%;border:1px solid #3d3424;background:#000;display:block;width:100%;height:auto}
 </style></head>
 <body>
 <div id="page">
@@ -38,6 +43,7 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
       </div>
       <div class="label" style="margin-top:6px">Or media URL (use for large videos)</div>
       <input id="post-url" class="input" placeholder="https://...">
+      <div id="post-preview" class="preview hidden"></div>
       <div class="label" style="margin-top:6px">Type</div>
       <select id="post-type" class="select">
         <option value="image">Image</option>
@@ -59,7 +65,7 @@ const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEY="caw_session_token";
-const state={token:""};
+const state={token:"",previewTimer:0};
 const MAX_UPLOAD=4718592;
 const MEDIA_MAX_CHARS=900000;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
@@ -89,6 +95,18 @@ async function apiPost(action,body,timeoutMs=30000){
     return null;
   }finally{
     clearTimeout(timer);
+  }
+}
+async function apiGet(action,params){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action",action);
+  if(params)Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+  try{
+    const resp=await fetch(url);
+    if(!resp.ok)return null;
+    return resp.json();
+  }catch{
+    return null;
   }
 }
 function statusFromError(error){
@@ -160,6 +178,61 @@ function deriveTitle({title,file,url}){
   }
   return "post";
 }
+function extractPostId(value){
+  const raw=String(value||"").trim();
+  if(!raw)return "";
+  try{
+    const parsed=new URL(raw,location.origin);
+    const idParam=parsed.searchParams.get("id");
+    if(idParam)return idParam;
+    const parts=parsed.pathname.split("/").filter(Boolean);
+    if(parts[0]==="post"&&parts[1])return decodeURIComponent(parts[1]);
+    return "";
+  }catch{
+    if(/^\d+$/.test(raw))return raw;
+    return "";
+  }
+}
+function clearPreview(){
+  const wrap=qs("#post-preview");
+  if(!wrap)return;
+  wrap.classList.add("hidden");
+  wrap.innerHTML="";
+}
+function renderPreview(post){
+  const wrap=qs("#post-preview");
+  if(!wrap)return;
+  wrap.innerHTML="";
+  wrap.classList.remove("hidden");
+  const title=document.createElement("div");
+  title.className="preview-title";
+  title.textContent=post.title||"(untitled)";
+  const meta=document.createElement("div");
+  meta.className="preview-meta";
+  meta.textContent=`by ${post.user||"anon"} • ${new Date(post.ts||0).toLocaleString()}`;
+  const media=document.createElement(post.type==="video"?"video":"img");
+  media.className="preview-media";
+  media.src=post.url;
+  if(post.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
+  wrap.append(title,meta,media);
+  if(post.description){
+    const desc=document.createElement("div");
+    desc.className="preview-desc";
+    desc.textContent=post.description;
+    wrap.appendChild(desc);
+  }
+}
+let previewToken=0;
+async function refreshPreview(){
+  const urlValue=qs("#post-url").value.trim();
+  const id=extractPostId(urlValue);
+  if(!id){clearPreview();return}
+  const token=++previewToken;
+  const data=await apiGet("post",{id});
+  if(token!==previewToken)return;
+  if(!data||!data.post){clearPreview();return}
+  renderPreview(data.post);
+}
 function postCreate(){
   const rawTitle=qs("#post-title").value.trim();
   const description=qs("#post-desc").value.trim();
@@ -178,6 +251,10 @@ qs("#clear-file").onclick=()=>{
   if(input)input.value="";
   setStatus("");
 };
+qs("#post-url").addEventListener("input",()=>{
+  clearTimeout(state.previewTimer);
+  state.previewTimer=setTimeout(refreshPreview,250);
+});
 loadState();
 refreshSession();
 </script>
