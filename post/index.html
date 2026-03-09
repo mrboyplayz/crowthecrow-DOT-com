@@ -97,7 +97,7 @@ function mediaTag(post){
 }
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function buildPostUrl(id){
-  return `${postBase}/post/${encodeURIComponent(id)}`;
+  return `${postBase}/post/?id=${encodeURIComponent(id)}`;
 }
 async function copyText(value){
   try{
@@ -364,7 +364,7 @@ function renderList(){
     const head=document.createElement("div");
     head.className="post-head";
     const safeTitle=p.title||"(untitled)";
-    head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
+    head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/?id=${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
     const body=document.createElement("div");
     body.className="post-body";
     const media=document.createElement(mediaTag(p));

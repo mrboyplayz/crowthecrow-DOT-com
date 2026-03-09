@@ -3,16 +3,16 @@
     {
       "source": "/post",
       "has": [
-        { "type": "query", "key": "id", "value": "(?<id>[^&]+)" }
+        { "type": "header", "key": "user-agent", "value": ".*Discordbot.*" }
       ],
-      "destination": "/post/:id"
+      "destination": "/api/caw-board?action=embed"
     },
     {
       "source": "/post/",
       "has": [
-        { "type": "query", "key": "id", "value": "(?<id>[^&]+)" }
+        { "type": "header", "key": "user-agent", "value": ".*Discordbot.*" }
       ],
-      "destination": "/post/:id"
+      "destination": "/api/caw-board?action=embed"
     },
     {
       "source": "/post/:id",

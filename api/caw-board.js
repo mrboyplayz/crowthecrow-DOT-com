@@ -564,24 +564,16 @@ export default async function handler(req, res) {
       const dataUrl = isKv ? String(await kvGet(mediaKey(post.id), "")) : urlField;
       const isData = urlField.startsWith("data:") || isKv;
       const mediaUrl = isData ? `${baseUrl}/api/caw-board?action=media&id=${encodeURIComponent(post.id)}` : urlField;
-      const postUrl = `${baseUrl}/post/${encodeURIComponent(post.id)}`;
-      const rawTitle = String(post.title || "post");
-      const rawUser = String(post.user || "anon");
-      const rawDescription = String(post.description || "").trim();
-      const combinedDescription = [`by ${rawUser}`, rawDescription].filter(Boolean).join(" • ").slice(0, 280);
-      const title = escapeHtml(rawTitle);
-      const desc = escapeHtml(combinedDescription || `by ${rawUser}`);
+      const postUrl = `${baseUrl}/post/?id=${encodeURIComponent(post.id)}`;
+      const title = escapeHtml(post.title || "post");
+      const desc = escapeHtml(`by ${post.user || "anon"}`);
+      const ogType = post.type === "video" ? "video.other" : "article";
       const mime = isData ? parseDataUrl(dataUrl || "")?.mime || "" : guessMime(urlField || "");
-      const embedType = mediaTypeFromMime(mime, post.type);
-      const ogType = embedType === "video" ? "video.other" : "article";
-      const escapedMediaUrl = escapeHtml(mediaUrl);
-      const escapedPostUrl = escapeHtml(postUrl);
-      const imageTag = `<meta property="og:image" content="${escapedMediaUrl}"><meta name="twitter:image" content="${escapedMediaUrl}">`;
-      const twitterCard = embedType === "video" ? "player" : "summary_large_image";
-      const videoTags = embedType === "video"
-        ? `<meta property="og:video" content="${escapedMediaUrl}"><meta property="og:video:secure_url" content="${escapedMediaUrl}"><meta property="og:video:type" content="${escapeHtml(mime || "video/mp4")}"><meta name="twitter:player" content="${escapedMediaUrl}">`
+      const videoTags = post.type === "video"
+        ? `<meta property="og:video" content="${escapeHtml(mediaUrl)}"><meta property="og:video:type" content="${escapeHtml(mime || "video/mp4")}">`
         : "";
-      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><meta name="description" content="${desc}"><meta property="og:title" content="${title}"><meta property="og:description" content="${desc}"><meta property="og:type" content="${ogType}"><meta property="og:url" content="${escapedPostUrl}"><meta property="og:site_name" content="Caw-board"><meta property="article:author" content="${escapeHtml(rawUser)}">${imageTag}${videoTags}<meta name="twitter:card" content="${twitterCard}"><meta name="twitter:title" content="${title}"><meta name="twitter:description" content="${desc}"></head><body><a href="${escapedPostUrl}">View post</a></body></html>`;
+      const imageTag = `<meta property="og:image" content="${escapeHtml(mediaUrl)}">`;
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><meta property="og:title" content="${title}"><meta property="og:description" content="${desc}"><meta property="og:type" content="${ogType}"><meta property="og:url" content="${escapeHtml(postUrl)}">${imageTag}${videoTags}<meta name="twitter:card" content="summary_large_image"></head><body><a href="${escapeHtml(postUrl)}">View post</a></body></html>`;
       res.status(200).setHeader("Content-Type", "text/html; charset=utf-8");
       res.end(html);
       return;

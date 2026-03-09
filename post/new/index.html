@@ -383,7 +383,7 @@ async function postFromFile(file,type,title,description){
   const resp=await apiPost("create_post",payload,45000);
   const postId=resp?.post?.id||resp?.id||"";
   if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));hideProgress();renderQuizStartPrompt();return}
-  location.href=`/post/${encodeURIComponent(postId)}`;
+  location.href=`/post/?id=${encodeURIComponent(postId)}`;
 }
 async function postFromUrl(url,type,title,description){
   if(!state.captchaPassToken){setStatus("captcha required");return}
@@ -391,7 +391,7 @@ async function postFromUrl(url,type,title,description){
   const resp=await apiPost("create_post",payload);
   const postId=resp?.post?.id||resp?.id||"";
   if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));renderQuizStartPrompt();return}
-  location.href=`/post/${encodeURIComponent(postId)}`;
+  location.href=`/post/?id=${encodeURIComponent(postId)}`;
 }
 function deriveTitle({title,file,url}){
   if(title)return title;
