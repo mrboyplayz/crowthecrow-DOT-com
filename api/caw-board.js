@@ -60,7 +60,7 @@ export default async function handler(req, res) {
   const MEDIA_MAX_CHARS = 900000;
   const MAX_ACCOUNTS_PER_IP = 3;
   const CAPTCHA_TTL_MS = 5 * 60 * 1000;
-  const CAW_BOARD_CLOSED = true;
+  const CAW_BOARD_CLOSED = false;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const action = u.searchParams.get("action") || "";
   const closedAllowActions = new Set(["embed", "captcha", "recaptcha_config", "login", "session", "admin_wipe_non_admin"]);

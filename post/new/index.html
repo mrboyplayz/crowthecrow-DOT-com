@@ -66,7 +66,7 @@ const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEY="caw_session_token";
-const CAW_BOARD_CLOSED=true;
+const CAW_BOARD_CLOSED=false;
 const state={token:"",previewTimer:0,recaptchaEnabled:false,recaptchaSiteKey:"",recaptchaWidgetId:null,recaptchaScriptReady:false};
 const MAX_UPLOAD=4718592;
 const MEDIA_MAX_CHARS=900000;
