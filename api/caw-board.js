@@ -12,8 +12,6 @@ export default async function handler(req, res) {
   const adminUser = process.env.CAW_ADMIN_USERNAME || "";
   const adminPass2 = process.env.ADMIN_CAW_BOARD_PASSWORD || "";
   const adminUser2 = process.env.ADMIN_CAW_BOARD_USERNAME || "";
-  const recaptchaSiteKey = process.env.RECAPTCHA_SITE_KEY || "";
-  const recaptchaSecretKey = process.env.RECAPTCHA_SECRET_KEY || "";
   const encoder = new TextEncoder();
   function escapeHtml(value) {
     return String(value || "")
@@ -57,13 +55,29 @@ export default async function handler(req, res) {
   const SESSIONS_KEY = "caw_sessions_v1";
   const MEDIA_KEY_PREFIX = "caw_media_v1:";
   const CAPTCHA_KEY_PREFIX = "caw_captcha_v1:";
+  const CAPTCHA_QUIZ_KEY_PREFIX = "caw_captcha_quiz_v1:";
+  const CAPTCHA_PASS_KEY_PREFIX = "caw_captcha_pass_v1:";
   const MEDIA_MAX_CHARS = 900000;
   const MAX_ACCOUNTS_PER_IP = 3;
   const CAPTCHA_TTL_MS = 5 * 60 * 1000;
+  const CAPTCHA_PASS_TTL_MS = 10 * 60 * 1000;
+  const CAPTCHA_QUIZ_COUNT = 5;
+  const CAPTCHA_QUESTIONS = [
+    { prompt: "Who is this SML Character?", image: "/smlwiki/jeffy.jpg", answers: ["jeffy"] },
+    { prompt: "When was Crow's ZCity first made?", image: "/pluv/crowpluv.png", answers: ["october 1st", "october 1st 2025", "2025/10/1"] },
+    { prompt: "When was Saudi Arabia first created?", image: "/caw-content/saudi.png", answers: ["September 23, 1932", "1932", "sep 23 1923"] },
+    { prompt: "Who is this SML Character?", image: "/smlwiki/marvin.jpg", answers: ["marvin", "mario"] },
+    { prompt: "Who is this SML Character?", image: "/smlwiki/brooklynguy.jpg", answers: ["brooklyn guy", "brooklynguy", "brooklyn t guy"] },
+    { prompt: "Who is this SML Character?", image: "/smlwiki/junior.jpg", answers: ["junior", "bowser junior"] },
+    { prompt: "Who is this SML Character?", image: "/smlwiki/joseph.jpg", answers: ["joseph"] },
+    { prompt: "Who is this SML Character?", image: "/smlwiki/cody.jpg", answers: ["cody"] },
+    { prompt: "Who is this SML Character?", image: "/smlwiki/shrek.jpg", answers: ["shrek"] },
+    { prompt: "Who is this SML Character?", image: "/smlwiki/chefpeepee.jpg", answers: ["chef pee pee", "chefpeepee"] }
+  ];
   const CAW_BOARD_CLOSED = false;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const action = u.searchParams.get("action") || "";
-  const closedAllowActions = new Set(["embed", "captcha", "recaptcha_config", "login", "session", "admin_wipe_non_admin"]);
+  const closedAllowActions = new Set(["embed", "captcha", "quiz_start", "quiz_answer", "login", "session", "admin_wipe_non_admin"]);
   if (CAW_BOARD_CLOSED) {
     if (req.method === "GET" && action === "embed") {
       res.status(503).setHeader("Content-Type", "text/html; charset=utf-8");
@@ -159,49 +173,44 @@ export default async function handler(req, res) {
   function captchaKey(id) {
     return `${CAPTCHA_KEY_PREFIX}${id}`;
   }
+  function captchaQuizKey(id) {
+    return `${CAPTCHA_QUIZ_KEY_PREFIX}${id}`;
+  }
+  function captchaPassKey(id) {
+    return `${CAPTCHA_PASS_KEY_PREFIX}${id}`;
+  }
   function isStoredMedia(urlField) {
     return String(urlField || "").startsWith("kv:");
   }
   function cleanCaptchaAnswer(value) {
     return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
   }
-  function expectedHostname(req) {
-    const host = String(req.headers.host || "").trim().toLowerCase();
-    if (!host) return "";
-    return host.split(":")[0];
+  function normalizeQuizAnswer(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
   }
-  async function verifyRecaptchaToken(value, req) {
-    const tokenValue = String(value || "").trim();
-    if (!tokenValue) return { ok: false, error: "captcha_required", code: 400 };
-    const params = new URLSearchParams();
-    params.set("secret", recaptchaSecretKey);
-    params.set("response", tokenValue);
-    const ip = clientIpFromReq(req);
-    if (ip) params.set("remoteip", ip);
-    try {
-      const resp = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString()
-      });
-      if (!resp.ok) return { ok: false, error: "captcha_verify_failed", code: 500 };
-      const data = await resp.json();
-      const errorCodes = Array.isArray(data?.["error-codes"]) ? data["error-codes"] : [];
-      if (!data?.success) {
-        if (errorCodes.includes("missing-input-response")) return { ok: false, error: "captcha_required", code: 400 };
-        if (errorCodes.includes("timeout-or-duplicate")) return { ok: false, error: "captcha_expired", code: 400 };
-        if (errorCodes.includes("missing-input-secret") || errorCodes.includes("invalid-input-secret")) {
-          return { ok: false, error: "captcha_verify_failed", code: 500 };
-        }
-        return { ok: false, error: "captcha_invalid", code: 400 };
-      }
-      const expected = expectedHostname(req);
-      const actual = String(data?.hostname || "").trim().toLowerCase();
-      if (expected && actual && expected !== actual) return { ok: false, error: "captcha_invalid", code: 400 };
-      return { ok: true };
-    } catch {
-      return { ok: false, error: "captcha_verify_failed", code: 500 };
+  function buildQuizQuestionPayload(quiz, index) {
+    const item = quiz.questions[index];
+    return {
+      quizId: quiz.id,
+      index: index + 1,
+      total: quiz.questions.length,
+      prompt: String(item?.prompt || "Who is this character?"),
+      image: String(item?.image || "")
+    };
+  }
+  function pickQuizQuestions() {
+    const pool = CAPTCHA_QUESTIONS.map(item => ({
+      prompt: String(item?.prompt || ""),
+      image: String(item?.image || ""),
+      answers: Array.isArray(item?.answers) ? item.answers.map(normalizeQuizAnswer).filter(Boolean) : []
+    })).filter(item => item.prompt && item.answers.length);
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = pool[i];
+      pool[i] = pool[j];
+      pool[j] = tmp;
     }
+    return pool.slice(0, Math.min(CAPTCHA_QUIZ_COUNT, pool.length));
   }
   function makeId() {
     if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
@@ -299,12 +308,67 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true, captchaId, prompt: `${a} + ${b} = ?` });
       return;
     }
-    if (req.method === "GET" && action === "recaptcha_config") {
-      res.status(200).json({
-        ok: true,
-        enabled: !!(recaptchaSiteKey && recaptchaSecretKey),
-        siteKey: recaptchaSiteKey || ""
-      });
+    if (req.method === "GET" && action === "quiz_start") {
+      const questions = pickQuizQuestions();
+      if (!questions.length) {
+        res.status(500).json({ error: "captcha_unavailable" });
+        return;
+      }
+      const quiz = { id: makeId(), created: now(), index: 0, questions };
+      const ok = await kvSet(captchaQuizKey(quiz.id), quiz);
+      if (!ok) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, ...buildQuizQuestionPayload(quiz, 0) });
+      return;
+    }
+    if (req.method === "POST" && action === "quiz_answer") {
+      const quizBody = await readBody();
+      const quizId = String(quizBody?.quizId || "");
+      const answer = normalizeQuizAnswer(quizBody?.answer || "");
+      if (!quizId || !answer) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const key = captchaQuizKey(quizId);
+      const quiz = await kvGet(key, null);
+      if (!quiz || typeof quiz !== "object" || !Array.isArray(quiz.questions)) {
+        res.status(400).json({ error: "captcha_expired" });
+        return;
+      }
+      const age = now() - Number(quiz.created || 0);
+      if (!Number.isFinite(age) || age > CAPTCHA_TTL_MS) {
+        await kvDel(key);
+        res.status(400).json({ error: "captcha_expired" });
+        return;
+      }
+      const idx = Number(quiz.index || 0);
+      const current = quiz.questions[idx];
+      const answerSet = Array.isArray(current?.answers) ? new Set(current.answers.map(normalizeQuizAnswer)) : new Set();
+      if (!answerSet.has(answer)) {
+        res.status(400).json({ error: "captcha_wrong_answer", ...buildQuizQuestionPayload(quiz, idx) });
+        return;
+      }
+      const nextIdx = idx + 1;
+      if (nextIdx >= quiz.questions.length) {
+        await kvDel(key);
+        const passToken = makeId();
+        const okPass = await kvSet(captchaPassKey(passToken), { ts: now() });
+        if (!okPass) {
+          res.status(500).json({ error: "kv_set_failed" });
+          return;
+        }
+        res.status(200).json({ ok: true, done: true, passToken });
+        return;
+      }
+      quiz.index = nextIdx;
+      const okQuiz = await kvSet(key, quiz);
+      if (!okQuiz) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, done: false, ...buildQuizQuestionPayload(quiz, nextIdx) });
       return;
     }
     if (req.method === "GET" && action === "posts") {
@@ -412,20 +476,23 @@ export default async function handler(req, res) {
     }
     const body = await readBody();
     async function verifyCaptcha() {
-      if (recaptchaSiteKey && recaptchaSecretKey) {
-        return verifyRecaptchaToken(body?.recaptchaToken, req);
-      }
-      const captchaId = String(body?.captchaId || "");
-      const captchaAnswer = cleanCaptchaAnswer(body?.captchaAnswer || "");
-      if (!captchaId || !captchaAnswer) return { ok: false, error: "captcha_required", code: 400 };
-      const key = captchaKey(captchaId);
-      const stored = await kvGet(key, null);
+      const passToken = String(body?.captchaPassToken || "");
+      if (!passToken) return { ok: false, error: "captcha_required", code: 400 };
+      const key = captchaPassKey(passToken);
+      const pass = await kvGet(key, null);
       await kvDel(key);
-      if (!stored || typeof stored !== "object") return { ok: false, error: "captcha_invalid", code: 400 };
-      const age = now() - Number(stored.ts || 0);
-      if (!Number.isFinite(age) || age > CAPTCHA_TTL_MS) return { ok: false, error: "captcha_expired", code: 400 };
-      if (!tscmp(captchaAnswer, cleanCaptchaAnswer(stored.answer || ""))) return { ok: false, error: "captcha_invalid", code: 400 };
+      if (!pass || typeof pass !== "object") return { ok: false, error: "captcha_invalid", code: 400 };
+      const age = now() - Number(pass.ts || 0);
+      if (!Number.isFinite(age) || age > CAPTCHA_PASS_TTL_MS) return { ok: false, error: "captcha_expired", code: 400 };
       return { ok: true };
+    }
+    if (req.method === "GET" && action === "recaptcha_config") {
+      res.status(200).json({
+        ok: true,
+        enabled: false,
+        siteKey: ""
+      });
+      return;
     }
     if (req.method === "POST" && action === "signup") {
       const captcha = await verifyCaptcha();
