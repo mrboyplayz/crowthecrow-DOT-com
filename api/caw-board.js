@@ -165,6 +165,11 @@ export default async function handler(req, res) {
   function cleanCaptchaAnswer(value) {
     return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
   }
+  function expectedHostname(req) {
+    const host = String(req.headers.host || "").trim().toLowerCase();
+    if (!host) return "";
+    return host.split(":")[0];
+  }
   async function verifyRecaptchaToken(value, req) {
     const tokenValue = String(value || "").trim();
     if (!tokenValue) return { ok: false, error: "captcha_required", code: 400 };
@@ -181,7 +186,18 @@ export default async function handler(req, res) {
       });
       if (!resp.ok) return { ok: false, error: "captcha_verify_failed", code: 500 };
       const data = await resp.json();
-      if (!data?.success) return { ok: false, error: "captcha_invalid", code: 400 };
+      const errorCodes = Array.isArray(data?.["error-codes"]) ? data["error-codes"] : [];
+      if (!data?.success) {
+        if (errorCodes.includes("missing-input-response")) return { ok: false, error: "captcha_required", code: 400 };
+        if (errorCodes.includes("timeout-or-duplicate")) return { ok: false, error: "captcha_expired", code: 400 };
+        if (errorCodes.includes("missing-input-secret") || errorCodes.includes("invalid-input-secret")) {
+          return { ok: false, error: "captcha_verify_failed", code: 500 };
+        }
+        return { ok: false, error: "captcha_invalid", code: 400 };
+      }
+      const expected = expectedHostname(req);
+      const actual = String(data?.hostname || "").trim().toLowerCase();
+      if (expected && actual && expected !== actual) return { ok: false, error: "captcha_invalid", code: 400 };
       return { ok: true };
     } catch {
       return { ok: false, error: "captcha_verify_failed", code: 500 };
