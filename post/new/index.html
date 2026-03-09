@@ -111,13 +111,18 @@ async function apiGet(action,params){
     return null;
   }
 }
+function getRecaptchaApi(){
+  if(window.grecaptcha&&typeof window.grecaptcha.render==="function")return window.grecaptcha;
+  if(window.grecaptcha&&window.grecaptcha.enterprise&&typeof window.grecaptcha.enterprise.render==="function")return window.grecaptcha.enterprise;
+  return null;
+}
 async function loadRecaptchaScript(){
   if(state.recaptchaScriptReady)return true;
-  if(window.grecaptcha){state.recaptchaScriptReady=true;return true}
+  if(getRecaptchaApi()){state.recaptchaScriptReady=true;return true}
   return new Promise(resolve=>{
     const existing=document.querySelector('script[data-recaptcha="1"]');
     if(existing){
-      existing.addEventListener("load",()=>{state.recaptchaScriptReady=!!window.grecaptcha;resolve(state.recaptchaScriptReady);},{once:true});
+      existing.addEventListener("load",()=>{state.recaptchaScriptReady=!!getRecaptchaApi();resolve(state.recaptchaScriptReady);},{once:true});
       existing.addEventListener("error",()=>resolve(false),{once:true});
       return;
     }
@@ -126,7 +131,7 @@ async function loadRecaptchaScript(){
     script.async=true;
     script.defer=true;
     script.dataset.recaptcha="1";
-    script.onload=()=>{state.recaptchaScriptReady=!!window.grecaptcha;resolve(state.recaptchaScriptReady)};
+    script.onload=()=>{state.recaptchaScriptReady=!!getRecaptchaApi();resolve(state.recaptchaScriptReady)};
     script.onerror=()=>resolve(false);
     document.head.appendChild(script);
   });
@@ -142,18 +147,22 @@ async function initRecaptcha(){
   }
   const ready=await loadRecaptchaScript();
   if(!ready){setStatus("captcha unavailable");return}
+  const api=getRecaptchaApi();
+  if(!api){setStatus("captcha unavailable");return}
   wrap.innerHTML='<div id="post-recaptcha"></div>';
-  state.recaptchaWidgetId=window.grecaptcha.render("post-recaptcha",{sitekey:state.recaptchaSiteKey});
+  state.recaptchaWidgetId=api.render("post-recaptcha",{sitekey:state.recaptchaSiteKey});
 }
 function getRecaptchaToken(){
   if(!state.recaptchaEnabled)return "";
-  if(!window.grecaptcha||state.recaptchaWidgetId==null)return "";
-  return String(window.grecaptcha.getResponse(state.recaptchaWidgetId)||"").trim();
+  const api=getRecaptchaApi();
+  if(!api||state.recaptchaWidgetId==null)return "";
+  return String(api.getResponse(state.recaptchaWidgetId)||"").trim();
 }
 function resetRecaptcha(){
   if(!state.recaptchaEnabled)return;
-  if(!window.grecaptcha||state.recaptchaWidgetId==null)return;
-  window.grecaptcha.reset(state.recaptchaWidgetId);
+  const api=getRecaptchaApi();
+  if(!api||state.recaptchaWidgetId==null)return;
+  api.reset(state.recaptchaWidgetId);
 }
 function statusFromError(error){
   if(error==="payload_too_large")return "file too big for server upload, use URL";
