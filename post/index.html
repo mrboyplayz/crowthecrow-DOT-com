@@ -89,6 +89,12 @@ const queryId=new URLSearchParams(location.search).get("id")||"";
 const hashId=(location.hash||"").replace(/^#/,"");
 const postId=queryId||(pathParts[0]==="post"&&pathParts[1]?decodeURIComponent(pathParts[1]):"")||hashId;
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
+function mediaTag(post){
+  const mime=String(post?.mime||"").toLowerCase();
+  if(mime.startsWith("video/"))return "video";
+  if(mime.startsWith("image/"))return "img";
+  return post?.type==="video"?"video":"img";
+}
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function buildPostUrl(id){
   return `${postBase}/post/?id=${encodeURIComponent(id)}`;
@@ -153,10 +159,10 @@ function renderPost(){
   head.innerHTML=`<div class="post-title">${safeTitle}</div><div class="post-meta">by ${post.user} • ${fmtTime(post.ts)}</div>`;
   const body=document.createElement("div");
   body.className="post-body";
-  const media=document.createElement(post.type==="video"?"video":"img");
+  const media=document.createElement(mediaTag(post));
   media.className="post-media";
   media.src=post.url;
-  if(post.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
+  if(mediaTag(post)==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
   body.appendChild(media);
   if(post.description){
     const desc=document.createElement("div");
@@ -345,10 +351,10 @@ function renderList(){
     head.innerHTML=`<div class="post-title"><a class="post-link" href="/post/?id=${encodeURIComponent(p.id)}">${safeTitle}</a></div><div class="post-meta">by ${p.user} • ${fmtTime(p.ts)}</div>`;
     const body=document.createElement("div");
     body.className="post-body";
-    const media=document.createElement(p.type==="video"?"video":"img");
+    const media=document.createElement(mediaTag(p));
     media.className="post-media";
     media.src=p.url;
-    if(p.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
+    if(mediaTag(p)==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
     body.appendChild(media);
     const votes=document.createElement("div");
     votes.className="vote-bar";

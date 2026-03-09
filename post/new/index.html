@@ -195,6 +195,12 @@ function statusFromError(error){
   if(error==="captcha_required"||error==="captcha_invalid"||error==="captcha_expired"||error==="captcha_wrong_answer")return "captcha failed";
   return "post save failed";
 }
+function mediaTag(post){
+  const mime=String(post?.mime||"").toLowerCase();
+  if(mime.startsWith("video/"))return "video";
+  if(mime.startsWith("image/"))return "img";
+  return post?.type==="video"?"video":"img";
+}
 function loadState(){
   state.token=LS.getItem(KEY)||"";
 }
@@ -294,10 +300,10 @@ function renderPreview(post){
   const meta=document.createElement("div");
   meta.className="preview-meta";
   meta.textContent=`by ${post.user||"anon"} • ${new Date(post.ts||0).toLocaleString()}`;
-  const media=document.createElement(post.type==="video"?"video":"img");
+  const media=document.createElement(mediaTag(post));
   media.className="preview-media";
   media.src=post.url;
-  if(post.type==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
+  if(mediaTag(post)==="video"){media.controls=true;media.preload="metadata"}else{media.loading="lazy";media.decoding="async"}
   wrap.append(title,meta,media);
   if(post.description){
     const desc=document.createElement("div");
@@ -321,9 +327,13 @@ function postCreate(){
   if(CAW_BOARD_CLOSED){setStatus("caw-board closed");return}
   const rawTitle=qs("#post-title").value.trim();
   const description=qs("#post-desc").value.trim();
-  const type=qs("#post-type").value;
+  const selectedType=qs("#post-type").value;
   const url=qs("#post-url").value.trim();
   const file=qs("#post-file").files[0];
+  const inferredType=file
+    ? (String(file.type||"").toLowerCase().startsWith("video/")?"video":"image")
+    : selectedType;
+  const type=inferredType==="video"?"video":"image";
   setStatus("");
   const title=deriveTitle({title:rawTitle,file,url});
   if(file){postFromFile(file,type,title,description);return}

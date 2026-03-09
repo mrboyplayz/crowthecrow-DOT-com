@@ -283,14 +283,27 @@ export default async function handler(req, res) {
     }
     return { likes, dislikes };
   }
-  function normalizePost(post, baseUrl) {
+  function mediaTypeFromMime(mime, fallbackType) {
+    const value = String(mime || "").toLowerCase();
+    if (value.startsWith("video/")) return "video";
+    if (value.startsWith("image/")) return "image";
+    return String(fallbackType || "image") === "video" ? "video" : "image";
+  }
+  async function normalizePost(post, baseUrl) {
     if (!post || typeof post !== "object") return post;
     const votes = normalizeVotes(post.votes);
     const counts = countVotes(votes);
     const urlField = String(post.url || "");
     const isData = urlField.startsWith("data:") || isStoredMedia(urlField);
     const mediaUrl = isData ? `${baseUrl}/api/caw-board?action=media&id=${encodeURIComponent(post.id)}` : urlField;
-    const next = { ...post, url: mediaUrl, likes: counts.likes, dislikes: counts.dislikes };
+    let mime = String(post.mime || "");
+    if (!mime && isStoredMedia(urlField)) {
+      const raw = String(await kvGet(mediaKey(post.id), ""));
+      mime = parseDataUrl(raw)?.mime || "";
+    }
+    if (!mime) mime = guessMime(urlField);
+    const type = mediaTypeFromMime(mime, post.type);
+    const next = { ...post, type, mime, url: mediaUrl, likes: counts.likes, dislikes: counts.dislikes };
     delete next.votes;
     return next;
   }
@@ -374,7 +387,7 @@ export default async function handler(req, res) {
     if (req.method === "GET" && action === "posts") {
       const posts = (await kvGet(POSTS_KEY, [])) || [];
       const baseUrl = baseUrlFromReq(req);
-      const list = Array.isArray(posts) ? posts.slice(0, 200).map(post => normalizePost(post, baseUrl)) : [];
+      const list = Array.isArray(posts) ? await Promise.all(posts.slice(0, 200).map(post => normalizePost(post, baseUrl))) : [];
       res.status(200).json({ posts: list });
       return;
     }
@@ -391,7 +404,7 @@ export default async function handler(req, res) {
         return;
       }
       const baseUrl = baseUrlFromReq(req);
-      res.status(200).json({ post: normalizePost(post, baseUrl) });
+      res.status(200).json({ post: await normalizePost(post, baseUrl) });
       return;
     }
     if (req.method === "GET" && action === "embed") {
@@ -604,7 +617,7 @@ export default async function handler(req, res) {
       const tokenValue = String(body?.token || "");
       let title = cleanTitle(body?.title);
       const description = cleanDescription(body?.description);
-      const type = String(body?.type || "image") === "video" ? "video" : "image";
+      const requestedType = String(body?.type || "image") === "video" ? "video" : "image";
       const urlField = String(body?.url || "").trim();
       if (!tokenValue || !urlField) {
         res.status(400).json({ error: "bad_request" });
@@ -620,6 +633,13 @@ export default async function handler(req, res) {
         return;
       }
       const isData = urlField.startsWith("data:");
+      let mime = "";
+      if (isData) {
+        mime = parseDataUrl(urlField)?.mime || "";
+      } else {
+        mime = guessMime(urlField);
+      }
+      const type = mediaTypeFromMime(mime, requestedType);
       if (isData) {
         if (urlField.length > MEDIA_MAX_CHARS) {
           res.status(413).json({ error: "payload_too_large" });
@@ -647,6 +667,7 @@ export default async function handler(req, res) {
         title,
         description,
         type,
+        mime,
         url: finalUrl,
         ts: now(),
         comments: [],
