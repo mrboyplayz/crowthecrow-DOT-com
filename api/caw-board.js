@@ -67,8 +67,18 @@ export default async function handler(req, res) {
   const CAPTCHA_QUIZ_COUNT = 5;
   const CAPTCHA_QUESTIONS = [
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jerryshop/jerry.png", answers: ["jerry"] },
-    { prompt: "When was Crow's ZCity first made?", image: "/pluv/crowpluv.png", answers: ["october 1st", "october 1st 2025", "2025/10/1"] },
-    { prompt: "When was Saudi Arabia first created?", image: "/caw-content/saudi.png", answers: ["September 23, 1932", "1932", "sep 23 1923"] },
+    {
+      prompt: "When was Crow's ZCity first made?",
+      image: "/pluv/crowpluv.png",
+      answers: ["october 1st", "october 1st 2025", "2025/10/1"],
+      choices: ["October 1st 2025", "January 5th 2024", "March 10th 2026", "June 1st 2023"]
+    },
+    {
+      prompt: "When was Saudi Arabia first created?",
+      image: "/caw-content/saudi.png",
+      answers: ["September 23, 1932", "1932", "sep 23 1932"],
+      choices: ["September 23, 1932", "September 23, 1923", "January 1, 1900", "December 10, 1945"]
+    },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/marvin.jpg", answers: ["marvin", "mario"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/brokenguy.webp", answers: ["brooklyn guy", "brooklynguy", "brooklyn t guy"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/juniorr.jpg", answers: ["junior", "bowser junior", "god"] },
@@ -201,14 +211,30 @@ export default async function handler(req, res) {
       index: index + 1,
       total: quiz.questions.length,
       prompt: String(item?.prompt || "Who is this character?"),
-      image: String(item?.image || "")
+      image: String(item?.image || ""),
+      choices: Array.isArray(item?.choices) ? item.choices.map(v => String(v || "")).filter(Boolean) : []
     };
+  }
+  function shuffleArray(list) {
+    const next = Array.isArray(list) ? [...list] : [];
+    for (let i = next.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = next[i];
+      next[i] = next[j];
+      next[j] = tmp;
+    }
+    return next;
   }
   function pickQuizQuestions() {
     const pool = CAPTCHA_QUESTIONS.map(item => ({
       prompt: String(item?.prompt || ""),
       image: String(item?.image || ""),
-      answers: Array.isArray(item?.answers) ? item.answers.map(normalizeQuizAnswer).filter(Boolean) : []
+      answers: Array.isArray(item?.answers) ? item.answers.map(normalizeQuizAnswer).filter(Boolean) : [],
+      choices: shuffleArray(
+        Array.isArray(item?.choices)
+          ? item.choices.map(v => String(v || "").trim()).filter(Boolean)
+          : []
+      )
     })).filter(item => item.prompt && item.answers.length);
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));

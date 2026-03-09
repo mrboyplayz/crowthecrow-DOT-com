@@ -43,7 +43,11 @@ const quizState={id:"",passToken:"",questionIndex:0,total:5};
 const FAIL_VIDEO_URL="/caw-content/sonothalal.mp4";
 const FAIL_REDIRECT_URL="https://zanryth.xyz/";
 const QUIZ_AUDIO_URL="/caw-content/kaHOOT.mp3";
+const QTE_KEYS=["q","w","e","a","s","d","z","x","c","j","k","l"];
+const QTE_CHANCE=0.35;
 let quizAudio=null;
+let qteTimer=0;
+let qteHandler=null;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 async function apiPost(action,body){
   const url=new URL(apiUrl,location.origin);
@@ -80,7 +84,43 @@ function stopQuizAudio(){
   quizAudio.pause();
   quizAudio.currentTime=0;
 }
+function renderQuizStartPrompt(){
+  stopQuizAudio();
+  quizState.passToken="";
+  const wrap=qs("#recaptcha-wrap");
+  if(!wrap)return;
+  wrap.innerHTML=`<button id="start-captcha-btn" class="btn" type="button" style="margin-top:8px">Begin Captcha</button>`;
+  const btn=qs("#start-captcha-btn");
+  if(btn)btn.onclick=startQuiz;
+}
+function clearQteOverlay(){
+  if(qteTimer){clearTimeout(qteTimer);qteTimer=0;}
+  if(qteHandler){window.removeEventListener("keydown",qteHandler);qteHandler=null;}
+  const existing=qs("#qte-overlay");
+  if(existing)existing.remove();
+}
+async function runQteIfNeeded(){
+  if(Math.random()>QTE_CHANCE)return true;
+  clearQteOverlay();
+  const key=QTE_KEYS[Math.floor(Math.random()*QTE_KEYS.length)];
+  const left=Math.floor(10+Math.random()*70);
+  const top=Math.floor(10+Math.random()*70);
+  const overlay=document.createElement("div");
+  overlay.id="qte-overlay";
+  overlay.style.cssText=`position:fixed;left:${left}vw;top:${top}vh;z-index:12000;background:#0b0b0b;border:2px solid #f5c95d;padding:10px;max-width:240px`;
+  overlay.innerHTML=`<div class="label">QTE: press <b>${key.toUpperCase()}</b> in 4s</div>`;
+  document.body.appendChild(overlay);
+  return await new Promise(resolve=>{
+    const done=value=>{clearQteOverlay();resolve(value);};
+    qteHandler=e=>{
+      if(String(e.key||"").toLowerCase()===key){done(true);}
+    };
+    window.addEventListener("keydown",qteHandler);
+    qteTimer=setTimeout(()=>done(false),4000);
+  });
+}
 function failAndBoot(){
+  clearQteOverlay();
   stopQuizAudio();
   const wrap=qs("#recaptcha-wrap");
   if(!wrap){location.href=FAIL_REDIRECT_URL;return}
@@ -100,14 +140,36 @@ function renderQuiz(question){
   quizState.id=question.quizId||"";
   quizState.questionIndex=Number(question.index||1);
   quizState.total=Number(question.total||5);
-  wrap.innerHTML=`<div class="label" style="margin-top:8px">Question ${quizState.questionIndex}/${quizState.total}: ${question.prompt||""}</div><img id="quiz-image" src="${question.image||""}" style="max-width:220px;display:block;border:1px solid #555;background:#000;margin-top:6px"><input id="quiz-answer" class="input" placeholder="type answer" style="margin-top:8px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:8px">Submit Answer</button>`;
+  const choices=Array.isArray(question.choices)?question.choices:[];
+  wrap.innerHTML=`<div class="label" style="margin-top:8px">Question ${quizState.questionIndex}/${quizState.total}: ${question.prompt||""}</div><img id="quiz-image" src="${question.image||""}" style="max-width:220px;display:block;border:1px solid #555;background:#000;margin-top:6px"><div id="quiz-choices" style="margin-top:8px"></div><input id="quiz-answer" class="input" placeholder="${choices.length?"or type your own answer":"type answer"}" style="margin-top:8px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:8px">Submit Answer</button>`;
   const input=qs("#quiz-answer");
   if(input)input.focus();
+  const choicesWrap=qs("#quiz-choices");
+  if(choicesWrap){
+    if(!choices.length){
+      choicesWrap.remove();
+    }else{
+      choices.forEach(choice=>{
+        const btn=document.createElement("button");
+        btn.className="btn";
+        btn.type="button";
+        btn.style.marginRight="6px";
+        btn.style.marginBottom="6px";
+        btn.textContent=String(choice||"");
+        btn.onclick=()=>{
+          if(input)input.value=String(choice||"");
+          submitQuizAnswer();
+        };
+        choicesWrap.appendChild(btn);
+      });
+    }
+  }
   const submit=qs("#quiz-answer-btn");
   if(submit)submit.onclick=submitQuizAnswer;
 }
 async function startQuiz(){
   quizState.passToken="";
+  setStatus("");
   const data=await apiGet("quiz_start");
   if(!data||!data.ok){setStatus("captcha unavailable");return}
   renderQuiz(data);
@@ -115,6 +177,8 @@ async function startQuiz(){
 }
 async function submitQuizAnswer(){
   ensureQuizAudio();
+  const qteOk=await runQteIfNeeded();
+  if(!qteOk){failAndBoot();return}
   const answer=String(qs("#quiz-answer")?.value||"").trim();
   if(!quizState.id||!answer){setStatus("captcha answer required");return}
   const data=await apiPost("quiz_answer",{quizId:quizState.id,answer});
@@ -135,8 +199,8 @@ async function submitQuizAnswer(){
     return;
   }
   if(data&&data.error==="captcha_expired"){
-    setStatus("captcha expired, restarting");
-    await startQuiz();
+    setStatus("captcha expired");
+    renderQuizStartPrompt();
     return;
   }
   setStatus("captcha failed");
@@ -150,7 +214,7 @@ async function login(){
   const resp=await apiPost("login",payload);
   if(!resp||!resp.token){
     setStatus(loginError(resp?.error));
-    await startQuiz();
+    renderQuizStartPrompt();
     return;
   }
   setToken(resp.token);
@@ -164,6 +228,6 @@ async function refreshSession(){
 }
 qs("#login-btn").onclick=login;
 refreshSession();
-startQuiz();
+renderQuizStartPrompt();
 </script>
 </body></html>

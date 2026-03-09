@@ -71,7 +71,11 @@ const state={token:"",previewTimer:0,quizId:"",quizIndex:0,quizTotal:5,captchaPa
 const FAIL_VIDEO_URL="/caw-content/sonothalal.mp4";
 const FAIL_REDIRECT_URL="https://zanryth.xyz/";
 const QUIZ_AUDIO_URL="/caw-content/kaHOOT.mp3";
+const QTE_KEYS=["q","w","e","a","s","d","z","x","c","j","k","l"];
+const QTE_CHANCE=0.35;
 let quizAudio=null;
+let qteTimer=0;
+let qteHandler=null;
 const MAX_UPLOAD=4718592;
 const MEDIA_MAX_CHARS=900000;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
@@ -121,9 +125,30 @@ function renderQuiz(question){
   state.quizId=question.quizId||"";
   state.quizIndex=Number(question.index||1);
   state.quizTotal=Number(question.total||5);
-  wrap.innerHTML=`<div class="label" style="margin-top:6px">Question ${state.quizIndex}/${state.quizTotal}: ${question.prompt||""}</div><img id="quiz-image" src="${question.image||""}" style="max-width:220px;display:block;border:1px solid #555;background:#000;margin-top:6px"><input id="quiz-answer" class="input" placeholder="type answer" style="margin-top:6px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:6px">Submit Answer</button>`;
+  const choices=Array.isArray(question.choices)?question.choices:[];
+  wrap.innerHTML=`<div class="label" style="margin-top:6px">Question ${state.quizIndex}/${state.quizTotal}: ${question.prompt||""}</div><img id="quiz-image" src="${question.image||""}" style="max-width:220px;display:block;border:1px solid #555;background:#000;margin-top:6px"><div id="quiz-choices" style="margin-top:6px"></div><input id="quiz-answer" class="input" placeholder="${choices.length?"or type your own answer":"type answer"}" style="margin-top:6px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:6px">Submit Answer</button>`;
   const input=qs("#quiz-answer");
   if(input)input.focus();
+  const choicesWrap=qs("#quiz-choices");
+  if(choicesWrap){
+    if(!choices.length){
+      choicesWrap.remove();
+    }else{
+      choices.forEach(choice=>{
+        const btn=document.createElement("button");
+        btn.className="btn";
+        btn.type="button";
+        btn.style.marginRight="6px";
+        btn.style.marginBottom="6px";
+        btn.textContent=String(choice||"");
+        btn.onclick=()=>{
+          if(input)input.value=String(choice||"");
+          submitQuizAnswer();
+        };
+        choicesWrap.appendChild(btn);
+      });
+    }
+  }
   const btn=qs("#quiz-answer-btn");
   if(btn)btn.onclick=submitQuizAnswer;
 }
@@ -139,7 +164,43 @@ function stopQuizAudio(){
   quizAudio.pause();
   quizAudio.currentTime=0;
 }
+function renderQuizStartPrompt(){
+  stopQuizAudio();
+  state.captchaPassToken="";
+  const wrap=qs("#recaptcha-wrap");
+  if(!wrap)return;
+  wrap.innerHTML=`<button id="start-captcha-btn" class="btn" type="button" style="margin-top:6px">Begin Captcha</button>`;
+  const btn=qs("#start-captcha-btn");
+  if(btn)btn.onclick=startQuiz;
+}
+function clearQteOverlay(){
+  if(qteTimer){clearTimeout(qteTimer);qteTimer=0;}
+  if(qteHandler){window.removeEventListener("keydown",qteHandler);qteHandler=null;}
+  const existing=qs("#qte-overlay");
+  if(existing)existing.remove();
+}
+async function runQteIfNeeded(){
+  if(Math.random()>QTE_CHANCE)return true;
+  clearQteOverlay();
+  const key=QTE_KEYS[Math.floor(Math.random()*QTE_KEYS.length)];
+  const left=Math.floor(10+Math.random()*70);
+  const top=Math.floor(10+Math.random()*70);
+  const overlay=document.createElement("div");
+  overlay.id="qte-overlay";
+  overlay.style.cssText=`position:fixed;left:${left}vw;top:${top}vh;z-index:12000;background:#0b0b0b;border:2px solid #f5c95d;padding:10px;max-width:240px`;
+  overlay.innerHTML=`<div class="label">QTE: press <b>${key.toUpperCase()}</b> in 4s</div>`;
+  document.body.appendChild(overlay);
+  return await new Promise(resolve=>{
+    const done=value=>{clearQteOverlay();resolve(value);};
+    qteHandler=e=>{
+      if(String(e.key||"").toLowerCase()===key){done(true);}
+    };
+    window.addEventListener("keydown",qteHandler);
+    qteTimer=setTimeout(()=>done(false),4000);
+  });
+}
 function failAndBoot(){
+  clearQteOverlay();
   stopQuizAudio();
   const wrap=qs("#recaptcha-wrap");
   if(!wrap){location.href=FAIL_REDIRECT_URL;return}
@@ -155,6 +216,7 @@ function failAndBoot(){
 }
 async function startQuiz(){
   state.captchaPassToken="";
+  setStatus("");
   const data=await apiGet("quiz_start");
   if(!data||!data.ok){setStatus("captcha unavailable");return}
   renderQuiz(data);
@@ -162,6 +224,8 @@ async function startQuiz(){
 }
 async function submitQuizAnswer(){
   ensureQuizAudio();
+  const qteOk=await runQteIfNeeded();
+  if(!qteOk){failAndBoot();return}
   const answer=String(qs("#quiz-answer")?.value||"").trim();
   if(!state.quizId||!answer){setStatus("captcha answer required");return}
   const data=await apiPost("quiz_answer",{quizId:state.quizId,answer});
@@ -182,8 +246,8 @@ async function submitQuizAnswer(){
     return;
   }
   if(data&&data.error==="captcha_expired"){
-    setStatus("captcha expired, restarting");
-    await startQuiz();
+    setStatus("captcha expired");
+    renderQuizStartPrompt();
     return;
   }
   setStatus("captcha failed");
@@ -239,7 +303,7 @@ async function postFromFile(file,type,title,description){
   const payload={token:state.token,title,description,type,url:dataUrl,captchaPassToken:state.captchaPassToken};
   const resp=await apiPost("create_post",payload,45000);
   const postId=resp?.post?.id||resp?.id||"";
-  if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));hideProgress();await startQuiz();return}
+  if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));hideProgress();renderQuizStartPrompt();return}
   location.href=`/post/?id=${encodeURIComponent(postId)}`;
 }
 async function postFromUrl(url,type,title,description){
@@ -247,7 +311,7 @@ async function postFromUrl(url,type,title,description){
   const payload={token:state.token,title,description,type,url,captchaPassToken:state.captchaPassToken};
   const resp=await apiPost("create_post",payload);
   const postId=resp?.post?.id||resp?.id||"";
-  if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));await startQuiz();return}
+  if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));renderQuizStartPrompt();return}
   location.href=`/post/?id=${encodeURIComponent(postId)}`;
 }
 function deriveTitle({title,file,url}){
@@ -358,7 +422,7 @@ if(CAW_BOARD_CLOSED){
 }else{
   loadState();
   refreshSession();
-  startQuiz();
+  renderQuizStartPrompt();
 }
 </script>
 </body></html>
