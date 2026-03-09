@@ -34,11 +34,13 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .post-link:hover{text-decoration:underline}
 .post-actions{margin-top:6px}
 .vote-bar{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
-.vote-btn{display:inline-flex;gap:4px;align-items:center}
+.vote-btn{display:inline-flex;gap:6px;align-items:center;padding:8px 12px;font-size:14px}
+#post-view .vote-btn{flex-direction:column;gap:2px}
+.vote-label{font-size:11px;color:#d8cba6;line-height:1.1;text-align:center}
 .vote-icon{font-size:14px;line-height:1}
 .vote-count{font-size:11px;color:#bdbdbd}
 #post-view .vote-bar{justify-content:center}
-.vote-img{width:32px;height:32px;display:block}
+.vote-img{width:40px;height:40px;display:block}
 .comment{background:#221e18;border:1px solid #0f0d09;margin-top:6px;padding:6px}
 .comment-meta{font-size:11px;color:#bdbdbd}
 .comment-text{font-size:12px;color:#e8e8e8}
@@ -197,11 +199,22 @@ function renderPost(){
   votes.className="vote-bar";
   const likeBtn=document.createElement("button");
   likeBtn.className="btn vote-btn";
-  likeBtn.innerHTML=`<img class="vote-img" src="/caw-content/thumbsup.png" alt="thumbs up"><span class="vote-count">${Number(post.likes||0)}</span>`;
+  likeBtn.innerHTML=`<img class="vote-img" src="/caw-content/thumbsup.png" alt="thumbs up"><span class="vote-count">${Number(post.likes||0)}</span><span class="vote-label">i love this video</span>`;
   likeBtn.onclick=async()=>{
     if(!state.token){setStatus("sign in to vote");return}
+    const prevLikes=Number(post.likes||0);
+    const prevDislikes=Number(post.dislikes||0);
+    post.likes=prevLikes+1;
+    likeBtn.querySelector(".vote-count").textContent=String(post.likes);
     const resp=await apiPost("vote",{token:state.token,postId:post.id,value:1});
-    if(!resp||!resp.ok){setStatus("vote failed");return}
+    if(!resp||!resp.ok){
+      post.likes=prevLikes;
+      post.dislikes=prevDislikes;
+      likeBtn.querySelector(".vote-count").textContent=String(post.likes);
+      dislikeBtn.querySelector(".vote-count").textContent=String(post.dislikes);
+      setStatus("vote failed");
+      return;
+    }
     post.likes=Number(resp.likes||0);
     post.dislikes=Number(resp.dislikes||0);
     likeBtn.querySelector(".vote-count").textContent=String(post.likes);
@@ -209,11 +222,22 @@ function renderPost(){
   };
   const dislikeBtn=document.createElement("button");
   dislikeBtn.className="btn vote-btn";
-  dislikeBtn.innerHTML=`<img class="vote-img" src="/caw-content/thumbsdown.png" alt="thumbs down"><span class="vote-count">${Number(post.dislikes||0)}</span>`;
+  dislikeBtn.innerHTML=`<img class="vote-img" src="/caw-content/thumbsdown.png" alt="thumbs down"><span class="vote-count">${Number(post.dislikes||0)}</span><span class="vote-label">this video fucking sucks</span>`;
   dislikeBtn.onclick=async()=>{
     if(!state.token){setStatus("sign in to vote");return}
+    const prevLikes=Number(post.likes||0);
+    const prevDislikes=Number(post.dislikes||0);
+    post.dislikes=prevDislikes+1;
+    dislikeBtn.querySelector(".vote-count").textContent=String(post.dislikes);
     const resp=await apiPost("vote",{token:state.token,postId:post.id,value:-1});
-    if(!resp||!resp.ok){setStatus("vote failed");return}
+    if(!resp||!resp.ok){
+      post.likes=prevLikes;
+      post.dislikes=prevDislikes;
+      likeBtn.querySelector(".vote-count").textContent=String(post.likes);
+      dislikeBtn.querySelector(".vote-count").textContent=String(post.dislikes);
+      setStatus("vote failed");
+      return;
+    }
     post.likes=Number(resp.likes||0);
     post.dislikes=Number(resp.dislikes||0);
     likeBtn.querySelector(".vote-count").textContent=String(post.likes);

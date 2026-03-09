@@ -53,6 +53,8 @@ export default async function handler(req, res) {
   const USERS_KEY = "caw_users_v1";
   const POSTS_KEY = "caw_posts_v1";
   const SESSIONS_KEY = "caw_sessions_v1";
+  const MEDIA_KEY_PREFIX = "caw_media_v1:";
+  const MEDIA_MAX_CHARS = 900000;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const action = u.searchParams.get("action") || "";
   function parseJSON(result, fallback) {
@@ -79,6 +81,13 @@ export default async function handler(req, res) {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(value)
+    });
+    return resp.ok;
+  }
+  async function kvDel(key) {
+    const resp = await fetch(`${url}/del/${key}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
     });
     return resp.ok;
   }
@@ -113,6 +122,12 @@ export default async function handler(req, res) {
   }
   function now() {
     return Date.now();
+  }
+  function mediaKey(id) {
+    return `${MEDIA_KEY_PREFIX}${id}`;
+  }
+  function isStoredMedia(urlField) {
+    return String(urlField || "").startsWith("kv:");
   }
   function makeId() {
     if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
@@ -185,18 +200,22 @@ export default async function handler(req, res) {
     }
     return { likes, dislikes };
   }
-  function normalizePost(post) {
+  function normalizePost(post, baseUrl) {
     if (!post || typeof post !== "object") return post;
     const votes = normalizeVotes(post.votes);
     const counts = countVotes(votes);
-    const next = { ...post, likes: counts.likes, dislikes: counts.dislikes };
+    const urlField = String(post.url || "");
+    const isData = urlField.startsWith("data:") || isStoredMedia(urlField);
+    const mediaUrl = isData ? `${baseUrl}/api/caw-board?action=media&id=${encodeURIComponent(post.id)}` : urlField;
+    const next = { ...post, url: mediaUrl, likes: counts.likes, dislikes: counts.dislikes };
     delete next.votes;
     return next;
   }
   try {
     if (req.method === "GET" && action === "posts") {
       const posts = (await kvGet(POSTS_KEY, [])) || [];
-      const list = Array.isArray(posts) ? posts.slice(0, 200).map(normalizePost) : [];
+      const baseUrl = baseUrlFromReq(req);
+      const list = Array.isArray(posts) ? posts.slice(0, 200).map(post => normalizePost(post, baseUrl)) : [];
       res.status(200).json({ posts: list });
       return;
     }
@@ -212,7 +231,8 @@ export default async function handler(req, res) {
         res.status(404).json({ error: "not_found" });
         return;
       }
-      res.status(200).json({ post: normalizePost(post) });
+      const baseUrl = baseUrlFromReq(req);
+      res.status(200).json({ post: normalizePost(post, baseUrl) });
       return;
     }
     if (req.method === "GET" && action === "embed") {
@@ -228,13 +248,16 @@ export default async function handler(req, res) {
         return;
       }
       const baseUrl = baseUrlFromReq(req);
-      const isData = String(post.url || "").startsWith("data:");
-      const mediaUrl = isData ? `${baseUrl}/api/caw-board?action=media&id=${encodeURIComponent(post.id)}` : String(post.url || "");
+      const urlField = String(post.url || "");
+      const isKv = isStoredMedia(urlField);
+      const dataUrl = isKv ? String(await kvGet(mediaKey(post.id), "")) : urlField;
+      const isData = urlField.startsWith("data:") || isKv;
+      const mediaUrl = isData ? `${baseUrl}/api/caw-board?action=media&id=${encodeURIComponent(post.id)}` : urlField;
       const postUrl = `${baseUrl}/post/?id=${encodeURIComponent(post.id)}`;
       const title = escapeHtml(post.title || "post");
       const desc = escapeHtml(`by ${post.user || "anon"}`);
       const ogType = post.type === "video" ? "video.other" : "article";
-      const mime = isData ? parseDataUrl(post.url || "")?.mime || "" : guessMime(post.url || "");
+      const mime = isData ? parseDataUrl(dataUrl || "")?.mime || "" : guessMime(urlField || "");
       const videoTags = post.type === "video"
         ? `<meta property="og:video" content="${escapeHtml(mediaUrl)}"><meta property="og:video:type" content="${escapeHtml(mime || "video/mp4")}">`
         : "";
@@ -257,11 +280,16 @@ export default async function handler(req, res) {
         return;
       }
       const urlField = String(post.url || "");
-      if (!urlField.startsWith("data:")) {
+      if (!urlField.startsWith("data:") && !isStoredMedia(urlField)) {
         res.status(302).setHeader("Location", urlField).end();
         return;
       }
-      const parsed = parseDataUrl(urlField);
+      const dataUrl = isStoredMedia(urlField) ? String(await kvGet(mediaKey(post.id), "")) : urlField;
+      if (!dataUrl) {
+        res.status(404).end();
+        return;
+      }
+      const parsed = parseDataUrl(dataUrl);
       if (!parsed) {
         res.status(400).end();
         return;
@@ -390,8 +418,9 @@ export default async function handler(req, res) {
         res.status(401).json({ error: "unauthorized" });
         return;
       }
-      if (urlField.startsWith("data:")) {
-        if (urlField.length > 40 * 1024 * 1024) {
+      const isData = urlField.startsWith("data:");
+      if (isData) {
+        if (urlField.length > MEDIA_MAX_CHARS) {
           res.status(413).json({ error: "payload_too_large" });
           return;
         }
@@ -402,13 +431,22 @@ export default async function handler(req, res) {
       const posts = (await kvGet(POSTS_KEY, [])) || [];
       const numericIds = Array.isArray(posts) ? posts.map(p => parseInt(p.id, 10)).filter(n => Number.isFinite(n)) : [];
       const nextId = numericIds.length ? Math.max(...numericIds) + 1 : 1;
+      let finalUrl = urlField;
+      if (isData) {
+        const mediaOk = await kvSet(mediaKey(nextId), urlField);
+        if (!mediaOk) {
+          res.status(500).json({ error: "kv_set_failed" });
+          return;
+        }
+        finalUrl = `kv:${nextId}`;
+      }
       const post = {
         id: String(nextId),
         user: session.user,
         title,
         description,
         type,
-        url: urlField,
+        url: finalUrl,
         ts: now(),
         comments: [],
         votes: {},
@@ -516,6 +554,9 @@ export default async function handler(req, res) {
         res.status(403).json({ error: "forbidden" });
         return;
       }
+      if (isStoredMedia(post.url)) {
+        await kvDel(mediaKey(post.id));
+      }
       posts = posts.filter(p => p.id !== postId);
       const ok = await kvSet(POSTS_KEY, posts);
       if (!ok) {
@@ -543,6 +584,14 @@ export default async function handler(req, res) {
         return;
       }
       let posts = (await kvGet(POSTS_KEY, [])) || [];
+      const post = posts.find(p => p.id === postId);
+      if (!post) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      if (isStoredMedia(post.url)) {
+        await kvDel(mediaKey(post.id));
+      }
       posts = posts.filter(p => p.id !== postId);
       const ok = await kvSet(POSTS_KEY, posts);
       if (!ok) {
@@ -563,6 +612,14 @@ export default async function handler(req, res) {
       if (!session || !session.admin) {
         res.status(401).json({ error: "unauthorized" });
         return;
+      }
+      const posts = (await kvGet(POSTS_KEY, [])) || [];
+      if (Array.isArray(posts)) {
+        for (const post of posts) {
+          if (isStoredMedia(post.url)) {
+            await kvDel(mediaKey(post.id));
+          }
+        }
       }
       const ok = await kvSet(POSTS_KEY, []);
       if (!ok) {
@@ -621,8 +678,16 @@ export default async function handler(req, res) {
         if (value && typeof value === "object" && value.user === username) continue;
         nextSessions[key] = value;
       }
-      let posts = (await kvGet(POSTS_KEY, [])) || [];
-      posts = Array.isArray(posts) ? posts.filter(p => p.user !== username) : [];
+      const allPosts = (await kvGet(POSTS_KEY, [])) || [];
+      if (Array.isArray(allPosts)) {
+        for (const post of allPosts) {
+          if (post.user !== username) continue;
+          if (isStoredMedia(post.url)) {
+            await kvDel(mediaKey(post.id));
+          }
+        }
+      }
+      let posts = Array.isArray(allPosts) ? allPosts.filter(p => p.user !== username) : [];
       posts.forEach(p => {
         if (!Array.isArray(p.comments)) return;
         p.comments = p.comments.filter(c => c.user !== username);

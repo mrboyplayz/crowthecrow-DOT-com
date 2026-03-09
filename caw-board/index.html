@@ -235,8 +235,19 @@ function renderPosts(){
     likeBtn.innerHTML=`<span class="vote-icon">👍</span><span class="vote-count">${Number(p.likes||0)}</span>`;
     likeBtn.onclick=async()=>{
       if(!state.token){setStatus("sign in to vote");return}
+      const prevLikes=Number(p.likes||0);
+      const prevDislikes=Number(p.dislikes||0);
+      p.likes=prevLikes+1;
+      likeBtn.querySelector(".vote-count").textContent=String(p.likes);
       const resp=await apiPost("vote",{token:state.token,postId:p.id,value:1});
-      if(!resp||!resp.ok){setStatus("vote failed");return}
+      if(!resp||!resp.ok){
+        p.likes=prevLikes;
+        p.dislikes=prevDislikes;
+        likeBtn.querySelector(".vote-count").textContent=String(p.likes);
+        dislikeBtn.querySelector(".vote-count").textContent=String(p.dislikes);
+        setStatus("vote failed");
+        return;
+      }
       p.likes=Number(resp.likes||0);
       p.dislikes=Number(resp.dislikes||0);
       likeBtn.querySelector(".vote-count").textContent=String(p.likes);
@@ -247,8 +258,19 @@ function renderPosts(){
     dislikeBtn.innerHTML=`<span class="vote-icon">👎</span><span class="vote-count">${Number(p.dislikes||0)}</span>`;
     dislikeBtn.onclick=async()=>{
       if(!state.token){setStatus("sign in to vote");return}
+      const prevLikes=Number(p.likes||0);
+      const prevDislikes=Number(p.dislikes||0);
+      p.dislikes=prevDislikes+1;
+      dislikeBtn.querySelector(".vote-count").textContent=String(p.dislikes);
       const resp=await apiPost("vote",{token:state.token,postId:p.id,value:-1});
-      if(!resp||!resp.ok){setStatus("vote failed");return}
+      if(!resp||!resp.ok){
+        p.likes=prevLikes;
+        p.dislikes=prevDislikes;
+        likeBtn.querySelector(".vote-count").textContent=String(p.likes);
+        dislikeBtn.querySelector(".vote-count").textContent=String(p.dislikes);
+        setStatus("vote failed");
+        return;
+      }
       p.likes=Number(resp.likes||0);
       p.dislikes=Number(resp.dislikes||0);
       likeBtn.querySelector(".vote-count").textContent=String(p.likes);
