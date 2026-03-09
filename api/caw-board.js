@@ -63,16 +63,15 @@ export default async function handler(req, res) {
   const CAPTCHA_PASS_TTL_MS = 10 * 60 * 1000;
   const CAPTCHA_QUIZ_COUNT = 5;
   const CAPTCHA_QUESTIONS = [
-    { prompt: "Who is this SML Character?", image: "/smlwiki/jeffy.jpg", answers: ["jeffy"] },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jerryshop/jerry.png", answers: ["jerry"] },
     { prompt: "When was Crow's ZCity first made?", image: "/pluv/crowpluv.png", answers: ["october 1st", "october 1st 2025", "2025/10/1"] },
     { prompt: "When was Saudi Arabia first created?", image: "/caw-content/saudi.png", answers: ["September 23, 1932", "1932", "sep 23 1923"] },
-    { prompt: "Who is this SML Character?", image: "/smlwiki/marvin.jpg", answers: ["marvin", "mario"] },
-    { prompt: "Who is this SML Character?", image: "/smlwiki/brooklynguy.jpg", answers: ["brooklyn guy", "brooklynguy", "brooklyn t guy"] },
-    { prompt: "Who is this SML Character?", image: "/smlwiki/junior.jpg", answers: ["junior", "bowser junior"] },
-    { prompt: "Who is this SML Character?", image: "/smlwiki/joseph.jpg", answers: ["joseph"] },
-    { prompt: "Who is this SML Character?", image: "/smlwiki/cody.jpg", answers: ["cody"] },
-    { prompt: "Who is this SML Character?", image: "/smlwiki/shrek.jpg", answers: ["shrek"] },
-    { prompt: "Who is this SML Character?", image: "/smlwiki/chefpeepee.jpg", answers: ["chef pee pee", "chefpeepee"] }
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/marvin.jpg", answers: ["marvin", "mario"] },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/brokenguy.webp", answers: ["brooklyn guy", "brooklynguy", "brooklyn t guy"] },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/juniorr.jpg", answers: ["junior", "bowser junior", "god"] },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jos.webp", answers: ["joseph"] },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/cody.jpg", answers: ["cody"] },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/chefpay.webp", answers: ["chef pee pee", "chefpeepee", "chef penis"] }
   ];
   const CAW_BOARD_CLOSED = false;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
