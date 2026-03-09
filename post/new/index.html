@@ -18,7 +18,7 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .links{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
 .hidden{display:none}
 .progress{width:100%;height:10px}
-.row{display:flex;gap:8px;flex-wrap:wrap}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row .select,.row .input{flex:1}
 </style></head>
 <body>
@@ -32,7 +32,10 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
       <div class="label" style="margin-top:6px">Description</div>
       <textarea id="post-desc" class="input" rows="4" placeholder="add a description"></textarea>
       <div class="label" style="margin-top:6px">Media file</div>
-      <input id="post-file" class="input" type="file" accept="image/*,video/*">
+      <div class="row">
+        <input id="post-file" class="input" type="file" accept="image/*,video/*">
+        <button id="clear-file" class="btn" type="button">Clear file</button>
+      </div>
       <div class="label" style="margin-top:6px">Or media URL (use for large videos)</div>
       <input id="post-url" class="input" placeholder="https://...">
       <div class="label" style="margin-top:6px">Type</div>
@@ -170,6 +173,11 @@ function postCreate(){
   setStatus("add a file or url");
 }
 qs("#post-btn").onclick=postCreate;
+qs("#clear-file").onclick=()=>{
+  const input=qs("#post-file");
+  if(input)input.value="";
+  setStatus("");
+};
 loadState();
 refreshSession();
 </script>
