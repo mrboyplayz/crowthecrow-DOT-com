@@ -77,7 +77,7 @@ export default async function handler(req, res) {
   const CAW_BOARD_CLOSED = false;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const action = u.searchParams.get("action") || "";
-  const closedAllowActions = new Set(["embed", "captcha", "quiz_start", "quiz_answer", "login", "session", "admin_wipe_non_admin"]);
+  const closedAllowActions = new Set(["embed", "captcha", "quiz_start", "quiz_answer", "login", "session", "admin_wipe_non_admin", "admin_wipe_users_without_posts"]);
   if (CAW_BOARD_CLOSED) {
     if (req.method === "GET" && action === "embed") {
       res.status(503).setHeader("Content-Type", "text/html; charset=utf-8");
@@ -905,6 +905,69 @@ export default async function handler(req, res) {
         return;
       }
       res.status(200).json({ ok: true, keptUsers: Object.keys(keptUsers).length, keptPosts: nextPosts.length, deletedPosts });
+      return;
+    }
+    if (req.method === "POST" && action === "admin_wipe_users_without_posts") {
+      const tokenValue = String(body?.token || "");
+      if (!tokenValue) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const sessions = await loadSessions();
+      const session = sessions[tokenValue];
+      if (!session || !session.admin) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const users = (await kvGet(USERS_KEY, {})) || {};
+      const posts = (await kvGet(POSTS_KEY, [])) || [];
+      const usersWithPosts = new Set(
+        Array.isArray(posts) ? posts.map(p => String(p?.user || "").trim()).filter(Boolean) : []
+      );
+      const removedUsers = [];
+      const nextUsers = {};
+      for (const [username, info] of Object.entries(users)) {
+        if (usersWithPosts.has(username)) {
+          nextUsers[username] = info;
+        } else {
+          removedUsers.push(username);
+        }
+      }
+      if (!removedUsers.length) {
+        res.status(200).json({ ok: true, removedUsers: 0, keptUsers: Object.keys(nextUsers).length });
+        return;
+      }
+      const removedSet = new Set(removedUsers);
+      const nextSessions = {};
+      for (const [key, value] of Object.entries(sessions)) {
+        const sessionUser = String(value?.user || "");
+        if (sessionUser && removedSet.has(sessionUser)) continue;
+        nextSessions[key] = value;
+      }
+      if (Array.isArray(posts)) {
+        posts.forEach(post => {
+          if (!post || typeof post !== "object") return;
+          if (Array.isArray(post.comments)) {
+            post.comments = post.comments.filter(c => !removedSet.has(String(c?.user || "")));
+          }
+          const votes = normalizeVotes(post.votes);
+          for (const name of Object.keys(votes)) {
+            if (removedSet.has(name)) delete votes[name];
+          }
+          const counts = countVotes(votes);
+          post.votes = votes;
+          post.likes = counts.likes;
+          post.dislikes = counts.dislikes;
+        });
+      }
+      const okUsers = await kvSet(USERS_KEY, nextUsers);
+      const okSessions = await kvSet(SESSIONS_KEY, nextSessions);
+      const okPosts = await kvSet(POSTS_KEY, posts);
+      if (!okUsers || !okSessions || !okPosts) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, removedUsers: removedUsers.length, keptUsers: Object.keys(nextUsers).length });
       return;
     }
     if (req.method === "POST" && action === "admin_users") {

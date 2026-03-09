@@ -73,6 +73,7 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
         <div id="admin-panel" class="panel hidden">
           <h3>Admin</h3>
           <button id="wipe-btn" class="btn">Wipe All Posts</button>
+          <button id="wipe-no-post-users-btn" class="btn" style="margin-top:6px">Wipe Users Without Posts</button>
           <div class="label" style="margin-top:8px">Users</div>
           <button id="load-users-btn" class="btn">Load Users</button>
           <div id="users-list" class="muted users-list"></div>
@@ -348,6 +349,18 @@ async function adminWipe(){
   if(!ok){setStatus("wipe failed");return}
   await fetchPosts();
 }
+async function adminWipeUsersWithoutPosts(){
+  if(!state.isAdmin)return;
+  if(!confirm("Wipe every user without posts?"))return;
+  setStatus("");
+  const resp=await apiPost("admin_wipe_users_without_posts",{token:state.token});
+  if(!resp||!resp.ok){setStatus("user wipe failed");return}
+  await fetchPosts();
+  setStatus(`removed ${Number(resp.removedUsers||0)} users`);
+  if(state.users.length){
+    await adminLoadUsers();
+  }
+}
 async function adminLoadUsers(){
   if(!state.isAdmin)return;
   setStatus("");
@@ -372,6 +385,7 @@ async function refreshSession(){
 function wire(){
   qs("#logout-btn").onclick=logout;
   qs("#wipe-btn").onclick=adminWipe;
+  qs("#wipe-no-post-users-btn").onclick=adminWipeUsersWithoutPosts;
   qs("#load-users-btn").onclick=adminLoadUsers;
 }
 if(CAW_BOARD_CLOSED){
