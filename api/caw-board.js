@@ -57,8 +57,11 @@ export default async function handler(req, res) {
   const CAPTCHA_KEY_PREFIX = "caw_captcha_v1:";
   const CAPTCHA_QUIZ_KEY_PREFIX = "caw_captcha_quiz_v1:";
   const CAPTCHA_PASS_KEY_PREFIX = "caw_captcha_pass_v1:";
+  const COMMENT_RATE_KEY_PREFIX = "caw_comment_rate_v1:";
   const MEDIA_MAX_CHARS = 900000;
   const MAX_ACCOUNTS_PER_IP = 3;
+  const COMMENT_BURST_COUNT = 4;
+  const COMMENT_COOLDOWN_MS = 40 * 1000;
   const CAPTCHA_TTL_MS = 5 * 60 * 1000;
   const CAPTCHA_PASS_TTL_MS = 10 * 60 * 1000;
   const CAPTCHA_QUIZ_COUNT = 5;
@@ -178,6 +181,9 @@ export default async function handler(req, res) {
   }
   function captchaPassKey(id) {
     return `${CAPTCHA_PASS_KEY_PREFIX}${id}`;
+  }
+  function commentRateKey(user) {
+    return `${COMMENT_RATE_KEY_PREFIX}${cleanUser(user)}`;
   }
   function isStoredMedia(urlField) {
     return String(urlField || "").startsWith("kv:");
@@ -742,11 +748,33 @@ export default async function handler(req, res) {
         res.status(404).json({ error: "not_found" });
         return;
       }
+      const rateKey = commentRateKey(session.user);
+      const rateState = (await kvGet(rateKey, { hits: [], cooldownUntil: 0 })) || { hits: [], cooldownUntil: 0 };
+      const nowTs = now();
+      const cooldownUntil = Number(rateState.cooldownUntil || 0);
+      if (cooldownUntil > nowTs) {
+        const retryAfterMs = cooldownUntil - nowTs;
+        res.status(429);
+        res.setHeader("Retry-After", String(Math.max(1, Math.ceil(retryAfterMs / 1000))));
+        res.json({ error: "comment_cooldown", retryAfterMs });
+        return;
+      }
+      const recentHits = Array.isArray(rateState.hits)
+        ? rateState.hits.map(v => Number(v || 0)).filter(v => Number.isFinite(v) && nowTs - v <= COMMENT_COOLDOWN_MS)
+        : [];
+      recentHits.push(nowTs);
+      let nextCooldownUntil = 0;
+      let nextHits = recentHits;
+      if (recentHits.length >= COMMENT_BURST_COUNT) {
+        nextCooldownUntil = nowTs + COMMENT_COOLDOWN_MS;
+        nextHits = [];
+      }
       const comment = { id: makeId(), user: session.user, text, ts: now() };
       post.comments = Array.isArray(post.comments) ? post.comments : [];
       post.comments.push(comment);
       const ok = await kvSet(POSTS_KEY, posts);
-      if (!ok) {
+      const okRate = await kvSet(rateKey, { hits: nextHits, cooldownUntil: nextCooldownUntil });
+      if (!ok || !okRate) {
         res.status(500).json({ error: "kv_set_failed" });
         return;
       }

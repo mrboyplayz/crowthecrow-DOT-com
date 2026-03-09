@@ -123,6 +123,14 @@ async function apiPost(action,body){
   if(!resp.ok)return null;
   return resp.json();
 }
+async function apiPostDetailed(action,body){
+  const url=new URL(apiUrl,location.origin);
+  url.searchParams.set("action",action);
+  const headers={"Content-Type":"application/json"};
+  const resp=await fetch(url,{method:"POST",headers,body:JSON.stringify(body||{})});
+  const data=await resp.json().catch(()=>null);
+  return {ok:resp.ok,data};
+}
 function loadState(){
   state.token=LS.getItem(KEYS.token)||"";
 }
@@ -322,8 +330,16 @@ function renderPost(){
       const text=inp.value.trim();
       if(!text)return;
       setStatus("");
-      const ok=await apiPost("comment",{token:state.token,postId:post.id,text});
-      if(!ok){setStatus("comment failed");return}
+      const result=await apiPostDetailed("comment",{token:state.token,postId:post.id,text});
+      if(!result.ok){
+        if(result.data?.error==="comment_cooldown"){
+          const seconds=Math.max(1,Math.ceil(Number(result.data?.retryAfterMs||0)/1000));
+          setStatus(`cooldown active: wait ${seconds}s`);
+          return;
+        }
+        setStatus("comment failed");
+        return;
+      }
       await fetchPost(post.id);
     };
     form.append(inp,btn);
