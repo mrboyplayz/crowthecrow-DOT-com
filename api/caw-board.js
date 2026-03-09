@@ -564,7 +564,7 @@ export default async function handler(req, res) {
       const dataUrl = isKv ? String(await kvGet(mediaKey(post.id), "")) : urlField;
       const isData = urlField.startsWith("data:") || isKv;
       const mediaUrl = isData ? `${baseUrl}/api/caw-board?action=media&id=${encodeURIComponent(post.id)}` : urlField;
-      const postUrl = `${baseUrl}/post/?id=${encodeURIComponent(post.id)}`;
+      const postUrl = `${baseUrl}/post/${encodeURIComponent(post.id)}`;
       const rawTitle = String(post.title || "post");
       const rawUser = String(post.user || "anon");
       const rawDescription = String(post.description || "").trim();
