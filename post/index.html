@@ -409,6 +409,11 @@ async function fetchPosts(){
   renderList();
 }
 async function fetchPost(id){
+  if(String(id)==="0"){
+    state.post={id:"0",title:"brooky",description:"",type:"video",url:"/caw-content/brooky.mp4",user:"system",ts:Date.now(),likes:0,dislikes:0,comments:[]};
+    renderPost();
+    return;
+  }
   const data=await apiGet("post",{id});
   state.post=data?.post||null;
   renderPost();

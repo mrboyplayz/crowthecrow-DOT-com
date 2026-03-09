@@ -71,7 +71,8 @@ export default async function handler(req, res) {
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/juniorr.jpg", answers: ["junior", "bowser junior", "god"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jos.webp", answers: ["joseph"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/cody.jpg", answers: ["cody"] },
-    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/chefpay.webp", answers: ["chef pee pee", "chefpeepee", "chef penis"] }
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/chefpay.webp", answers: ["chef pee pee", "chefpeepee", "chef penis"] },
+    { prompt: "Who is this ??? Character?", image: "/caw-content/FASHION.jpg", answers: ["fashion new year"] },
   ];
   const CAW_BOARD_CLOSED = false;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
