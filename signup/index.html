@@ -127,6 +127,10 @@ function captchaModalContent(){
   ensureCaptchaModal();
   return qs("#captcha-modal-content");
 }
+function setCaptchaInlineStatus(text){
+  const el=qs("#captcha-inline-status");
+  if(el)el.textContent=String(text||"");
+}
 function renderQuizStartPrompt(){
   stopQuizAudio();
   quizState.passToken="";
@@ -187,9 +191,17 @@ function renderQuiz(question){
   quizState.questionIndex=Number(question.index||1);
   quizState.total=Number(question.total||5);
   const choices=Array.isArray(question.choices)?question.choices:[];
-  wrap.innerHTML=`<div class="captcha-title">Question ${quizState.questionIndex}/${quizState.total}: ${question.prompt||""}</div><img id="quiz-image" class="captcha-image" src="${question.image||""}"><div id="quiz-choices" class="captcha-choices"></div><input id="quiz-answer" class="input" placeholder="${choices.length?"or type your own answer":"type answer"}" style="margin-top:8px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:8px">Submit Answer</button>`;
+  wrap.innerHTML=`<div class="captcha-title">Question ${quizState.questionIndex}/${quizState.total}: ${question.prompt||""}</div><img id="quiz-image" class="captcha-image" src="${question.image||""}"><div id="quiz-choices" class="captcha-choices"></div><input id="quiz-answer" class="input" placeholder="${choices.length?"or type your own answer":"type answer"}" style="margin-top:8px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:8px">Submit Answer</button><div id="captcha-inline-status" class="muted" style="margin-top:6px"></div>`;
   const input=qs("#quiz-answer");
-  if(input)input.focus();
+  if(input){
+    input.focus();
+    input.onkeydown=e=>{
+      if(e.key==="Enter"){
+        e.preventDefault();
+        submitQuizAnswer();
+      }
+    };
+  }
   const choicesWrap=qs("#quiz-choices");
   if(choicesWrap){
     if(!choices.length){
@@ -223,34 +235,56 @@ async function startQuiz(){
 }
 async function submitQuizAnswer(){
   ensureQuizAudio();
+  const submitBtn=qs("#quiz-answer-btn");
+  if(submitBtn)submitBtn.disabled=true;
+  setCaptchaInlineStatus("checking...");
   const qteOk=await runQteIfNeeded();
-  if(!qteOk){failAndBoot();return}
+  if(!qteOk){
+    if(submitBtn)submitBtn.disabled=false;
+    failAndBoot();
+    return;
+  }
   const answer=String(qs("#quiz-answer")?.value||"").trim();
-  if(!quizState.id||!answer){setStatus("captcha answer required");return}
+  if(!quizState.id||!answer){
+    if(submitBtn)submitBtn.disabled=false;
+    setCaptchaInlineStatus("captcha answer required");
+    setStatus("captcha answer required");
+    return;
+  }
   const data=await apiPost("quiz_answer",{quizId:quizState.id,answer});
   if(data&&data.ok&&data.done&&data.passToken){
     playCorrectSound();
     stopQuizAudio();
+    clearQteOverlay();
     quizState.passToken=String(data.passToken);
+    qs("#recaptcha-wrap").innerHTML="";
     hideCaptchaModal();
+    setCaptchaInlineStatus("");
     setStatus("captcha passed");
     return;
   }
   if(data&&data.ok&&!data.done){
     playCorrectSound();
+    if(submitBtn)submitBtn.disabled=false;
+    setCaptchaInlineStatus("");
     setStatus("");
     renderQuiz(data);
     return;
   }
   if(data&&data.error==="captcha_wrong_answer"){
+    if(submitBtn)submitBtn.disabled=false;
     failAndBoot();
     return;
   }
   if(data&&data.error==="captcha_expired"){
+    if(submitBtn)submitBtn.disabled=false;
+    setCaptchaInlineStatus("captcha expired");
     setStatus("captcha expired");
     renderQuizStartPrompt();
     return;
   }
+  if(submitBtn)submitBtn.disabled=false;
+  setCaptchaInlineStatus("captcha failed");
   setStatus("captcha failed");
 }
 async function signup(){
