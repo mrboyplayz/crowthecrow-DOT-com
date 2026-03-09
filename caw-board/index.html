@@ -32,7 +32,7 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .post-actions{margin-top:6px}
 .vote-bar{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
 .vote-btn{display:inline-flex;gap:4px;align-items:center}
-.vote-icon{width:16px;height:16px;display:inline-block}
+.vote-icon{font-size:14px;line-height:1}
 .vote-count{font-size:11px;color:#bdbdbd}
 .comment{background:#252525;border:1px solid #111;margin-top:6px;padding:6px}
 .comment-meta{font-size:11px;color:#bdbdbd}
@@ -230,7 +230,7 @@ function renderPosts(){
     votes.className="vote-bar";
     const likeBtn=document.createElement("button");
     likeBtn.className="btn vote-btn";
-    likeBtn.innerHTML=`<svg class="vote-icon" viewBox="0 0 56 952"><use href="/cawcontent/cool.svg#like-gray"></use></svg><span class="vote-count">${Number(p.likes||0)}</span>`;
+    likeBtn.innerHTML=`<span class="vote-icon">👍</span><span class="vote-count">${Number(p.likes||0)}</span>`;
     likeBtn.onclick=async()=>{
       if(!state.token){setStatus("sign in to vote");return}
       const resp=await apiPost("vote",{token:state.token,postId:p.id,value:1});
@@ -242,7 +242,7 @@ function renderPosts(){
     };
     const dislikeBtn=document.createElement("button");
     dislikeBtn.className="btn vote-btn";
-    dislikeBtn.innerHTML=`<svg class="vote-icon" viewBox="0 0 56 952"><use href="/cawcontent/cool.svg#dislike-gray"></use></svg><span class="vote-count">${Number(p.dislikes||0)}</span>`;
+    dislikeBtn.innerHTML=`<span class="vote-icon">👎</span><span class="vote-count">${Number(p.dislikes||0)}</span>`;
     dislikeBtn.onclick=async()=>{
       if(!state.token){setStatus("sign in to vote");return}
       const resp=await apiPost("vote",{token:state.token,postId:p.id,value:-1});
