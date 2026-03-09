@@ -99,6 +99,18 @@ export default async function handler(req, res) {
       answers: ["jon"],
       choices: ["Freakpool", "jon"]
     },
+    {
+      prompt: "what is freakpool's favorite game",
+      image: "/smlwiki/jerryshop/jerry.png",
+      answers: ["FarmD", "both"],
+      choices: ["FarmD", "tasque manager NSFW MODEL GARRY'S MOD", "both"]
+    },
+    {
+      prompt: "What is Grok's purpose (discord bot)?",
+      image: "/caw-content/grok.png",
+      answers: ["to do nothing and be annoying all the time"],
+      choices: ["to do nothing and be annoying all the time", "controlled by datze", "an amazing bot that makes the chat lively"]
+    },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/marvin.jpg", answers: ["marvin", "mario"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/brokenguy.webp", answers: ["brooklyn guy", "brooklynguy", "brooklyn t guy"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/juniorr.jpg", answers: ["junior", "bowser junior", "god"] },
