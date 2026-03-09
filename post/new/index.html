@@ -29,27 +29,13 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
       <input id="post-title" class="input" placeholder="title">
       <div class="label" style="margin-top:6px">Media file</div>
       <input id="post-file" class="input" type="file" accept="image/*,video/*">
-      <div class="label" style="margin-top:6px">Or media URL</div>
+      <div class="label" style="margin-top:6px">Or media URL (use for large videos)</div>
       <input id="post-url" class="input" placeholder="https://...">
       <div class="label" style="margin-top:6px">Type</div>
       <select id="post-type" class="select">
         <option value="image">Image</option>
         <option value="video">Video</option>
       </select>
-      <div class="label" style="margin-top:6px">Video compression</div>
-      <div class="row">
-        <label class="muted"><input id="compress-video" type="checkbox" checked> Compress</label>
-        <select id="compress-width" class="select">
-          <option value="640">640px</option>
-          <option value="854">854px</option>
-          <option value="1280">1280px</option>
-        </select>
-        <select id="compress-bitrate" class="select">
-          <option value="500000">500kbps</option>
-          <option value="800000" selected>800kbps</option>
-          <option value="1200000">1200kbps</option>
-        </select>
-      </div>
       <button id="post-btn" class="btn" style="margin-top:8px">Post</button>
     </div>
     <div id="status" class="muted" style="margin-top:6px"></div>
@@ -67,7 +53,7 @@ const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.c
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEY="caw_session_token";
 const state={token:""};
-const MAX_UPLOAD=4*1024*1024;
+const MAX_UPLOAD=4718592;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
 function showProgress(value){
   const el=qs("#upload-progress");
@@ -107,64 +93,6 @@ function fileToDataUrl(file){
     reader.readAsDataURL(file);
   });
 }
-function supportsCompression(){
-  return typeof MediaRecorder!=="undefined"&&typeof HTMLCanvasElement!=="undefined";
-}
-async function compressVideo(file,maxWidth,bitrate){
-  return new Promise(resolve=>{
-    if(!supportsCompression())return resolve(null);
-    const video=document.createElement("video");
-    video.muted=true;
-    video.playsInline=true;
-    const url=URL.createObjectURL(file);
-    video.src=url;
-    video.onloadedmetadata=()=>{
-      const scale=Math.min(1,maxWidth/Math.max(1,video.videoWidth));
-      const width=Math.max(1,Math.round(video.videoWidth*scale));
-      const height=Math.max(1,Math.round(video.videoHeight*scale));
-      const canvas=document.createElement("canvas");
-      canvas.width=width;
-      canvas.height=height;
-      const ctx=canvas.getContext("2d");
-      if(!ctx){URL.revokeObjectURL(url);return resolve(null)}
-      const stream=canvas.captureStream(30);
-      const types=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"];
-      const mime=types.find(t=>MediaRecorder.isTypeSupported(t))||"";
-      let recorder;
-      try{
-        recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:bitrate});
-      }catch{
-        URL.revokeObjectURL(url);
-        return resolve(null);
-      }
-      const chunks=[];
-      recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
-      recorder.onstop=()=>{
-        URL.revokeObjectURL(url);
-        resolve(new Blob(chunks,{type:mime||"video/webm"}));
-      };
-      let rafId=0;
-      const draw=()=>{
-        if(video.paused||video.ended){return}
-        ctx.drawImage(video,0,0,width,height);
-        rafId=requestAnimationFrame(draw);
-      };
-      video.onended=()=>{
-        cancelAnimationFrame(rafId);
-        recorder.stop();
-      };
-      recorder.start();
-      video.play().then(draw).catch(()=>{
-        cancelAnimationFrame(rafId);
-        try{recorder.stop()}catch{}
-      });
-    };
-    video.onerror=()=>{
-      URL.revokeObjectURL(url);
-      resolve(null);
-    };
-  });
-}
 async function refreshSession(){
   if(!state.token){qs("#post-locked").classList.remove("hidden");return}
   qs("#post-locked").classList.add("hidden");
@@ -180,19 +108,7 @@ async function refreshSession(){
 }
 async function postFromFile(file,type,title){
   if(file.size>MAX_UPLOAD){setStatus("file too big for server upload, use URL");return}
-  const shouldCompress=type==="video"&&qs("#compress-video").checked;
-  let uploadFile=file;
-  if(shouldCompress){
-    if(!supportsCompression()){setStatus("compression not supported, use a URL");return}
-    const maxWidth=parseInt(qs("#compress-width").value,10)||640;
-    const bitrate=parseInt(qs("#compress-bitrate").value,10)||800000;
-    setStatus("compressing...");
-    showProgress(0);
-    const blob=await compressVideo(file,maxWidth,bitrate);
-    if(!blob){setStatus("compression failed");hideProgress();return}
-    uploadFile=new File([blob],file.name.replace(/\.[^/.]+$/,"")+".webm",{type:blob.type||"video/webm"});
-  }
-  if(uploadFile.size>MAX_UPLOAD){setStatus("file too big for server upload, use URL");hideProgress();return}
+  const uploadFile=file;
   setStatus("preparing...");
   showProgress(null);
   const dataUrl=await fileToDataUrl(uploadFile);

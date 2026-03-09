@@ -32,6 +32,9 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .comment{background:#252525;border:1px solid #111;margin-top:6px;padding:6px}
 .comment-meta{font-size:11px;color:#bdbdbd}
 .comment-text{font-size:12px;color:#e8e8e8}
+.pager{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.pager .btn{padding:4px 8px}
+.pager .btn[aria-current="page"]{background:linear-gradient(#7a6a4a,#5a4a2a)}
 </style></head>
 <body>
 <div id="page">
@@ -56,6 +59,7 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
   <div id="post-view" class="hidden"></div>
   <div id="post-list" class="hidden">
     <div id="posts"></div>
+    <div id="pager" class="pager"></div>
   </div>
 </div>
 <script>
@@ -63,17 +67,18 @@ const qs=e=>document.querySelector(e);
 const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
-const embedBase=apiBase||location.origin;
+const postBase=apiBase||location.origin;
 const KEYS={token:"caw_session_token"};
-const state={token:"",sessionUser:null,isAdmin:false,post:null,posts:[]};
+const state={token:"",sessionUser:null,isAdmin:false,post:null,posts:[],page:1};
+const PAGE_SIZE=24;
 const pathParts=location.pathname.split("/").filter(Boolean);
 const queryId=new URLSearchParams(location.search).get("id")||"";
 const hashId=(location.hash||"").replace(/^#/,"");
 const postId=queryId||(pathParts[0]==="post"&&pathParts[1]?decodeURIComponent(pathParts[1]):"")||hashId;
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
-function buildEmbedUrl(id){
-  return `${embedBase}/api/caw-board?action=embed&id=${encodeURIComponent(id)}`;
+function buildPostUrl(id){
+  return `${postBase}/post/?id=${encodeURIComponent(id)}`;
 }
 async function copyText(value){
   try{
@@ -176,7 +181,7 @@ function renderPost(){
   embed.className="btn";
   embed.textContent="Copy Embed Link";
   embed.onclick=async()=>{
-    const url=buildEmbedUrl(post.id);
+    const url=buildPostUrl(post.id);
     const ok=await copyText(url);
     if(!ok){prompt("Embed link",url);return}
     setStatus("embed link copied");
@@ -232,7 +237,11 @@ function renderList(){
   const list=qs("#posts");
   list.innerHTML="";
   const sorted=[...state.posts].sort((a,b)=>b.ts-a.ts);
-  sorted.forEach(p=>{
+  const totalPages=Math.max(1,Math.ceil(sorted.length/PAGE_SIZE));
+  if(state.page>totalPages)state.page=totalPages;
+  const start=(state.page-1)*PAGE_SIZE;
+  const pageItems=sorted.slice(start,start+PAGE_SIZE);
+  pageItems.forEach(p=>{
     const wrap=document.createElement("div");
     wrap.className="post";
     const head=document.createElement("div");
@@ -249,10 +258,55 @@ function renderList(){
     wrap.append(head,body);
     list.appendChild(wrap);
   });
+  renderPager(totalPages);
+}
+function renderPager(totalPages){
+  const pager=qs("#pager");
+  if(!pager)return;
+  pager.innerHTML="";
+  if(totalPages<=1)return;
+  const addBtn=(label,page,disabled=false,current=false)=>{
+    const btn=document.createElement("button");
+    btn.className="btn";
+    btn.textContent=label;
+    if(disabled)btn.disabled=true;
+    if(current)btn.setAttribute("aria-current","page");
+    btn.onclick=()=>{
+      if(disabled||page===state.page)return;
+      state.page=page;
+      renderList();
+    };
+    pager.appendChild(btn);
+  };
+  addBtn("←",Math.max(1,state.page-1),state.page<=1);
+  const pages=[];
+  if(totalPages<=7){
+    for(let i=1;i<=totalPages;i++)pages.push(i);
+  }else{
+    pages.push(1);
+    let start=Math.max(2,state.page-1);
+    let end=Math.min(totalPages-1,state.page+1);
+    if(start>2)pages.push("…");
+    for(let i=start;i<=end;i++)pages.push(i);
+    if(end<totalPages-1)pages.push("…");
+    pages.push(totalPages);
+  }
+  pages.forEach(p=>{
+    if(p==="…"){
+      const span=document.createElement("span");
+      span.className="muted";
+      span.textContent="…";
+      pager.appendChild(span);
+      return;
+    }
+    addBtn(String(p),p,false,p===state.page);
+  });
+  addBtn("→",Math.min(totalPages,state.page+1),state.page>=totalPages);
 }
 async function fetchPosts(){
   const data=await apiGet("posts");
   state.posts=Array.isArray(data?.posts)?data.posts:[];
+  state.page=1;
   renderList();
 }
 async function fetchPost(id){
