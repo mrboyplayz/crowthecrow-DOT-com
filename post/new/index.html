@@ -65,6 +65,7 @@ const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEY="caw_session_token";
+const CAW_BOARD_CLOSED=true;
 const state={token:"",previewTimer:0};
 const MAX_UPLOAD=4718592;
 const MEDIA_MAX_CHARS=900000;
@@ -234,6 +235,7 @@ async function refreshPreview(){
   renderPreview(data.post);
 }
 function postCreate(){
+  if(CAW_BOARD_CLOSED){setStatus("caw-board closed");return}
   const rawTitle=qs("#post-title").value.trim();
   const description=qs("#post-desc").value.trim();
   const type=qs("#post-type").value;
@@ -255,7 +257,14 @@ qs("#post-url").addEventListener("input",()=>{
   clearTimeout(state.previewTimer);
   state.previewTimer=setTimeout(refreshPreview,250);
 });
-loadState();
-refreshSession();
+if(CAW_BOARD_CLOSED){
+  qs("#post-form").classList.add("hidden");
+  qs("#post-locked").classList.remove("hidden");
+  qs("#post-locked").textContent="Caw-board is currently closed.";
+  setStatus("posting disabled");
+}else{
+  loadState();
+  refreshSession();
+}
 </script>
 </body></html>

@@ -55,8 +55,22 @@ export default async function handler(req, res) {
   const SESSIONS_KEY = "caw_sessions_v1";
   const MEDIA_KEY_PREFIX = "caw_media_v1:";
   const MEDIA_MAX_CHARS = 900000;
+  const MAX_ACCOUNTS_PER_IP = 3;
+  const CAW_BOARD_CLOSED = true;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const action = u.searchParams.get("action") || "";
+  const closedAllowActions = new Set(["embed", "login", "session", "admin_wipe_non_admin"]);
+  if (CAW_BOARD_CLOSED) {
+    if (req.method === "GET" && action === "embed") {
+      res.status(503).setHeader("Content-Type", "text/html; charset=utf-8");
+      res.end("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta property=\"og:title\" content=\"Caw-board closed\"><meta property=\"og:description\" content=\"Caw-board is currently closed.\"><meta name=\"twitter:card\" content=\"summary\"></head><body>Caw-board is currently closed.</body></html>");
+      return;
+    }
+    if (!closedAllowActions.has(action)) {
+      res.status(503).json({ error: "caw_board_closed" });
+      return;
+    }
+  }
   function parseJSON(result, fallback) {
     if (result == null) return fallback;
     if (typeof result === "string") {
@@ -119,6 +133,18 @@ export default async function handler(req, res) {
   }
   function cleanUser(s) {
     return String(s || "").trim().slice(0, 24).replace(/[^\w.-]/g, "");
+  }
+  function adminNamesSet() {
+    const names = [cleanUser(adminUser), cleanUser(adminUser2)].filter(Boolean);
+    return new Set(names);
+  }
+  function clientIpFromReq(req) {
+    const forwarded = String(req.headers["x-forwarded-for"] || "").split(",").map(v => v.trim()).filter(Boolean);
+    if (forwarded.length) return forwarded[0];
+    const real = String(req.headers["x-real-ip"] || "").trim();
+    if (real) return real;
+    const socketIp = String(req.socket?.remoteAddress || "").trim();
+    return socketIp || "";
   }
   function now() {
     return Date.now();
@@ -332,9 +358,17 @@ export default async function handler(req, res) {
         res.status(409).json({ error: "exists" });
         return;
       }
+      const signupIp = clientIpFromReq(req);
+      if (signupIp) {
+        const usedCount = Object.values(users).reduce((acc, user) => acc + (user?.signupIp === signupIp ? 1 : 0), 0);
+        if (usedCount >= MAX_ACCOUNTS_PER_IP) {
+          res.status(429).json({ error: "ip_limit_reached" });
+          return;
+        }
+      }
       const salt = randomSalt();
       const hash = await hashPass(password, salt);
-      users[username] = { salt, hash, created: now() };
+      users[username] = { salt, hash, created: now(), signupIp };
       const ok = await kvSet(USERS_KEY, users);
       if (!ok) {
         res.status(500).json({ error: "kv_set_failed" });
@@ -627,6 +661,62 @@ export default async function handler(req, res) {
         return;
       }
       res.status(200).json({ ok: true });
+      return;
+    }
+    if (req.method === "POST" && action === "admin_wipe_non_admin") {
+      const tokenValue = String(body?.token || "");
+      if (!tokenValue) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const sessions = await loadSessions();
+      const session = sessions[tokenValue];
+      if (!session || !session.admin) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const adminNames = adminNamesSet();
+      const users = (await kvGet(USERS_KEY, {})) || {};
+      const keptUsers = {};
+      for (const [name, info] of Object.entries(users)) {
+        if (adminNames.has(name)) keptUsers[name] = info;
+      }
+      const keptSessions = {};
+      for (const [key, value] of Object.entries(sessions)) {
+        if (!value || typeof value !== "object" || !value.user) continue;
+        if (value.admin || adminNames.has(value.user)) keptSessions[key] = value;
+      }
+      const allPosts = (await kvGet(POSTS_KEY, [])) || [];
+      const nextPosts = [];
+      let deletedPosts = 0;
+      if (Array.isArray(allPosts)) {
+        for (const post of allPosts) {
+          const owner = String(post?.user || "");
+          if (!adminNames.has(owner)) {
+            deletedPosts++;
+            if (isStoredMedia(post.url)) await kvDel(mediaKey(post.id));
+            continue;
+          }
+          post.comments = Array.isArray(post.comments) ? post.comments.filter(c => adminNames.has(String(c?.user || ""))) : [];
+          const votes = normalizeVotes(post.votes);
+          for (const name of Object.keys(votes)) {
+            if (!adminNames.has(name)) delete votes[name];
+          }
+          const counts = countVotes(votes);
+          post.votes = votes;
+          post.likes = counts.likes;
+          post.dislikes = counts.dislikes;
+          nextPosts.push(post);
+        }
+      }
+      const okUsers = await kvSet(USERS_KEY, keptUsers);
+      const okSessions = await kvSet(SESSIONS_KEY, keptSessions);
+      const okPosts = await kvSet(POSTS_KEY, nextPosts);
+      if (!okUsers || !okSessions || !okPosts) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, keptUsers: Object.keys(keptUsers).length, keptPosts: nextPosts.length, deletedPosts });
       return;
     }
     if (req.method === "POST" && action === "admin_users") {

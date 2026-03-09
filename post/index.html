@@ -81,6 +81,7 @@ const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.c
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const postBase=apiBase||location.origin;
 const KEYS={token:"caw_session_token"};
+const CAW_BOARD_CLOSED=true;
 const state={token:"",sessionUser:null,isAdmin:false,post:null,posts:[],page:1};
 const PAGE_SIZE=24;
 const pathParts=location.pathname.split("/").filter(Boolean);
@@ -413,6 +414,13 @@ async function fetchPost(id){
   renderPost();
 }
 async function init(){
+  if(CAW_BOARD_CLOSED){
+    qs("#post-view").classList.remove("hidden");
+    qs("#post-list").classList.add("hidden");
+    qs("#post-view").innerHTML=`<div class="panel"><div class="muted">Caw-board is currently closed.</div></div>`;
+    setStatus("caw-board closed");
+    return;
+  }
   loadState();
   await refreshSession();
   if(postId){

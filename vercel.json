@@ -1,5 +1,33 @@
 {
   "rewrites": [
+    {
+      "source": "/post",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*Discordbot.*" }
+      ],
+      "destination": "/api/caw-board?action=embed"
+    },
+    {
+      "source": "/post/",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*Discordbot.*" }
+      ],
+      "destination": "/api/caw-board?action=embed"
+    },
+    {
+      "source": "/post/:id",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*Discordbot.*" }
+      ],
+      "destination": "/api/caw-board?action=embed&id=:id"
+    },
+    {
+      "source": "/post/:id/",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*Discordbot.*" }
+      ],
+      "destination": "/api/caw-board?action=embed&id=:id"
+    },
     { "source": "/post/:id", "destination": "/post/index.html" },
     { "source": "/post/:id/", "destination": "/post/index.html" }
   ]

@@ -99,6 +99,7 @@ const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEYS={token:"caw_session_token"};
+const CAW_BOARD_CLOSED=true;
 const state={posts:[],users:[],sessionUser:null,token:"",isAdmin:false,page:1};
 const PAGE_SIZE=24;
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
@@ -367,8 +368,12 @@ function wire(){
   qs("#wipe-btn").onclick=adminWipe;
   qs("#load-users-btn").onclick=adminLoadUsers;
 }
-loadState();
-wire();
-refreshSession().then(fetchPosts);
+if(CAW_BOARD_CLOSED){
+  qs("#page").innerHTML=`<div class="panel"><h3>Caw-board Closed</h3><div class="muted">Caw-board is currently closed.</div></div>`;
+}else{
+  loadState();
+  wire();
+  refreshSession().then(fetchPosts);
+}
 </script>
 </body></html>
