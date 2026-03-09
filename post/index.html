@@ -179,12 +179,12 @@ function renderPost(){
   }
   const embed=document.createElement("button");
   embed.className="btn";
-  embed.textContent="Copy Embed Link";
+  embed.textContent="Copy Post Link";
   embed.onclick=async()=>{
     const url=buildPostUrl(post.id);
     const ok=await copyText(url);
-    if(!ok){prompt("Embed link",url);return}
-    setStatus("embed link copied");
+    if(!ok){prompt("Post link",url);return}
+    setStatus("post link copied");
   };
   ensureActions().appendChild(embed);
   const cwrap=document.createElement("div");
