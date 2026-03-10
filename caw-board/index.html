@@ -31,6 +31,7 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .post-media{max-width:100%;border:1px solid #3d3424;background:#000;display:block;width:100%;height:auto;max-height:220px;object-fit:cover}
 .post-link{color:#ffe3a3;text-decoration:none}
 .post-link:hover{text-decoration:underline}
+#post-link{text-align:left}
 .post-actions{margin-top:6px}
 .vote-bar{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
 .vote-btn{display:inline-flex;gap:4px;align-items:center}
@@ -78,6 +79,14 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
           <h3>Rules</h3>
           <div class="muted">no Porn buddy this is a meme image board send bullshit idk just dont make it porn looking at you GREG.</div>
         </div>
+        <div class="panel">
+          <h3>Create Post</h3>
+          <div id="post-locked" class="muted">Sign in to post.</div>
+          <div id="post-link" class="hidden">
+            <a class="btn" href="/post/new/">Create New Post</a>
+          </div>
+          <div id="status" class="muted" style="margin-top:6px"></div>
+        </div>
         <div id="admin-panel" class="panel hidden">
           <h3>Admin</h3>
           <div id="site-status" class="muted" style="margin-top:4px"></div>
@@ -95,14 +104,6 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
         </div>
       </td>
       <td class="main">
-        <div class="panel">
-          <h3>Create Post</h3>
-          <div id="post-locked" class="muted">Sign in to post.</div>
-          <div id="post-link" class="hidden">
-            <a class="btn" href="/post/new/">Create New Post</a>
-          </div>
-          <div id="status" class="muted" style="margin-top:6px"></div>
-        </div>
         <div id="posts"></div>
         <div id="pager" class="pager"></div>
       </td>
