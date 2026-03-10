@@ -131,7 +131,7 @@ export default async function handler(req, res) {
   const CAW_BOARD_CLOSED = false;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const action = u.searchParams.get("action") || "";
-  const closedAllowActions = new Set(["embed", "captcha", "quiz_start", "quiz_answer", "login", "session", "site_status", "admin_set_site_status", "admin_wipe_non_admin", "admin_wipe_users_without_posts", "admin_ip_ban_user"]);
+  const closedAllowActions = new Set(["embed", "proxy", "captcha", "quiz_start", "quiz_answer", "login", "session", "site_status", "admin_set_site_status", "admin_wipe_non_admin", "admin_wipe_users_without_posts", "admin_ip_ban_user"]);
   if (CAW_BOARD_CLOSED) {
     if (req.method === "GET" && action === "embed") {
       res.status(503).setHeader("Content-Type", "text/html; charset=utf-8");
@@ -480,6 +480,54 @@ export default async function handler(req, res) {
     const siteStatus = await loadSiteStatus();
     const siteClosed = CAW_BOARD_CLOSED || !!siteStatus.closed;
     const siteReason = cleanReason(siteStatus.reason || "");
+    if (req.method === "GET" && action === "proxy") {
+      const target = String(u.searchParams.get("url") || "");
+      if (!target) {
+        res.status(400).end();
+        return;
+      }
+      let parsed;
+      try {
+        parsed = new URL(target);
+      } catch {
+        res.status(400).end();
+        return;
+      }
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        res.status(400).end();
+        return;
+      }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      let resp;
+      try {
+        resp = await fetch(parsed.toString(), {
+          signal: controller.signal,
+          redirect: "follow",
+          headers: { "User-Agent": "Mozilla/5.0" }
+        });
+      } catch {
+        clearTimeout(timer);
+        res.status(502).end();
+        return;
+      }
+      clearTimeout(timer);
+      const contentType = String(resp.headers.get("content-type") || "");
+      const buffer = Buffer.from(await resp.arrayBuffer());
+      if (contentType.includes("text/html")) {
+        let html = buffer.toString("utf8");
+        const baseHref = `${parsed.origin}${parsed.pathname.replace(/[^/]*$/, "")}`;
+        html = html.replace(/<meta[^>]+http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, "");
+        html = html.replace(/<base[^>]*>/gi, "");
+        html = html.replace(/<head([^>]*)>/i, `<head$1><base href="${escapeHtml(baseHref)}">`);
+        res.status(200).setHeader("Content-Type", "text/html; charset=utf-8");
+        res.end(html);
+        return;
+      }
+      if (contentType) res.setHeader("Content-Type", contentType);
+      res.status(200).end(buffer);
+      return;
+    }
     if (req.method === "GET" && action === "captcha") {
       const a = 1 + Math.floor(Math.random() * 9);
       const b = 1 + Math.floor(Math.random() * 9);
