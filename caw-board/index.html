@@ -80,6 +80,13 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
         </div>
         <div id="admin-panel" class="panel hidden">
           <h3>Admin</h3>
+          <div id="site-status" class="muted" style="margin-top:4px"></div>
+          <div class="label" style="margin-top:8px">Close reason</div>
+          <textarea id="site-close-reason" class="textarea" rows="3" placeholder="reason shown to users"></textarea>
+          <div style="margin-top:6px">
+            <button id="site-close-btn" class="btn">Close Site</button>
+            <button id="site-open-btn" class="btn">Open Site</button>
+          </div>
           <button id="wipe-btn" class="btn">Wipe All Posts</button>
           <button id="wipe-no-post-users-btn" class="btn" style="margin-top:6px">Wipe Users Without Posts</button>
           <div class="label" style="margin-top:8px">Users</div>
@@ -115,7 +122,7 @@ const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.c
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEYS={token:"caw_session_token"};
 const CAW_BOARD_CLOSED=false;
-const state={posts:[],users:[],sessionUser:null,token:"",isAdmin:false,page:1};
+const state={posts:[],users:[],sessionUser:null,token:"",isAdmin:false,page:1,siteClosed:false,siteReason:""};
 const PAGE_SIZE=24;
 let loadingTimer=0;
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleString()}
@@ -126,6 +133,23 @@ function mediaTag(post){
   return post?.type==="video"?"video":"img";
 }
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
+function applySiteStatus(status){
+  state.siteClosed=!!status?.closed;
+  state.siteReason=String(status?.reason||"");
+  const label=qs("#site-status");
+  if(label)label.textContent=state.siteClosed?`Site closed${state.siteReason?`: ${state.siteReason}`:""}`:"Site open";
+  const reasonInput=qs("#site-close-reason");
+  if(reasonInput&&state.siteReason&&!reasonInput.value)reasonInput.value=state.siteReason;
+}
+async function fetchSiteStatus(){
+  const data=await apiGet("site_status");
+  applySiteStatus(data||{closed:false,reason:""});
+  return state.siteClosed;
+}
+function renderClosedPage(){
+  const reason=state.siteReason?`<div class="muted">${state.siteReason}</div>`:"";
+  qs("#page").innerHTML=`<div class="panel"><h3>Caw-board Closed</h3>${reason}</div>`;
+}
 function showLoading(){
   const overlay=qs("#loading-overlay");
   const textEl=qs("#loading-text");
@@ -397,6 +421,19 @@ async function adminWipe(){
   if(!ok){setStatus("wipe failed");return}
   await fetchPosts();
 }
+async function adminSetSiteClosed(closed){
+  if(!state.isAdmin)return;
+  setStatus("");
+  const reason=String(qs("#site-close-reason")?.value||"").trim();
+  const resp=await apiPost("admin_set_site_status",{token:state.token,closed,reason});
+  if(!resp||!resp.ok){setStatus("site update failed");return}
+  applySiteStatus(resp);
+  if(state.siteClosed){
+    setStatus(`site closed${state.siteReason?`: ${state.siteReason}`:""}`);
+  }else{
+    setStatus("site opened");
+  }
+}
 async function adminWipeUsersWithoutPosts(){
   if(!state.isAdmin)return;
   if(!confirm("Wipe every user without posts?"))return;
@@ -419,7 +456,8 @@ async function adminLoadUsers(){
   setStatus(`loaded ${state.users.length} users`);
 }
 async function fetchPosts(){
-  const data=await apiGet("posts");
+  const params=state.siteClosed&&state.isAdmin&&state.token?{token:state.token}:null;
+  const data=await apiGet("posts",params);
   state.posts=Array.isArray(data?.posts)?data.posts:[];
   state.page=1;
   renderPosts();
@@ -432,6 +470,8 @@ async function refreshSession(){
 }
 function wire(){
   qs("#logout-btn").onclick=logout;
+  qs("#site-close-btn").onclick=()=>adminSetSiteClosed(true);
+  qs("#site-open-btn").onclick=()=>adminSetSiteClosed(false);
   qs("#wipe-btn").onclick=adminWipe;
   qs("#wipe-no-post-users-btn").onclick=adminWipeUsersWithoutPosts;
   qs("#load-users-btn").onclick=adminLoadUsers;
@@ -444,7 +484,14 @@ if(CAW_BOARD_CLOSED){
   showLoading();
   Promise.resolve()
     .then(refreshSession)
-    .then(fetchPosts)
+    .then(fetchSiteStatus)
+    .then(closed=>{
+      if(closed&&!state.isAdmin){
+        renderClosedPage();
+        return;
+      }
+      return fetchPosts();
+    })
     .finally(hideLoading);
 }
 </script>

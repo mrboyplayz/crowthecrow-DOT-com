@@ -55,6 +55,7 @@ export default async function handler(req, res) {
   const SESSIONS_KEY = "caw_sessions_v1";
   const BANNED_USERS_KEY = "caw_banned_users_v1";
   const BANNED_IPS_KEY = "caw_banned_ips_v1";
+  const SITE_STATUS_KEY = "caw_site_status_v1";
   const MEDIA_KEY_PREFIX = "caw_media_v1:";
   const CAPTCHA_KEY_PREFIX = "caw_captcha_v1:";
   const CAPTCHA_QUIZ_KEY_PREFIX = "caw_captcha_quiz_v1:";
@@ -130,7 +131,7 @@ export default async function handler(req, res) {
   const CAW_BOARD_CLOSED = false;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const action = u.searchParams.get("action") || "";
-  const closedAllowActions = new Set(["embed", "captcha", "quiz_start", "quiz_answer", "login", "session", "admin_wipe_non_admin", "admin_wipe_users_without_posts", "admin_ip_ban_user"]);
+  const closedAllowActions = new Set(["embed", "captcha", "quiz_start", "quiz_answer", "login", "session", "site_status", "admin_set_site_status", "admin_wipe_non_admin", "admin_wipe_users_without_posts", "admin_ip_ban_user"]);
   if (CAW_BOARD_CLOSED) {
     if (req.method === "GET" && action === "embed") {
       res.status(503).setHeader("Content-Type", "text/html; charset=utf-8");
@@ -189,6 +190,10 @@ export default async function handler(req, res) {
   }
   function cleanDescription(s) {
     s = String(s || "").trim().slice(0, 400);
+    return s.replace(/[<>&]/g, "");
+  }
+  function cleanReason(s) {
+    s = String(s || "").trim().slice(0, 240);
     return s.replace(/[<>&]/g, "");
   }
   function titleFromUrl(urlField) {
@@ -306,6 +311,11 @@ export default async function handler(req, res) {
   }
   function now() {
     return Date.now();
+  }
+  async function loadSiteStatus() {
+    const status = await kvGet(SITE_STATUS_KEY, null);
+    if (!status || typeof status !== "object") return { closed: false, reason: "" };
+    return { closed: !!status.closed, reason: cleanReason(status.reason || "") };
   }
   function mediaKey(id) {
     return `${MEDIA_KEY_PREFIX}${id}`;
@@ -467,6 +477,9 @@ export default async function handler(req, res) {
     return next;
   }
   try {
+    const siteStatus = await loadSiteStatus();
+    const siteClosed = CAW_BOARD_CLOSED || !!siteStatus.closed;
+    const siteReason = cleanReason(siteStatus.reason || "");
     if (req.method === "GET" && action === "captcha") {
       const a = 1 + Math.floor(Math.random() * 9);
       const b = 1 + Math.floor(Math.random() * 9);
@@ -544,6 +557,22 @@ export default async function handler(req, res) {
       return;
     }
     if (req.method === "GET" && action === "posts") {
+      if (siteClosed) {
+        const tokenValue = String(u.searchParams.get("token") || "");
+        if (tokenValue) {
+          const sessions = await loadSessions();
+          const session = sessions[tokenValue];
+          if (session && session.admin) {
+            const posts = (await kvGet(POSTS_KEY, [])) || [];
+            const baseUrl = baseUrlFromReq(req);
+            const list = Array.isArray(posts) ? await Promise.all(posts.slice(0, 200).map(post => normalizePost(post, baseUrl))) : [];
+            res.status(200).json({ posts: list });
+            return;
+          }
+        }
+        res.status(503).json({ error: "caw_board_closed", reason: siteReason });
+        return;
+      }
       const posts = (await kvGet(POSTS_KEY, [])) || [];
       const baseUrl = baseUrlFromReq(req);
       const list = Array.isArray(posts) ? await Promise.all(posts.slice(0, 200).map(post => normalizePost(post, baseUrl))) : [];
@@ -551,6 +580,31 @@ export default async function handler(req, res) {
       return;
     }
     if (req.method === "GET" && action === "post") {
+      if (siteClosed) {
+        const tokenValue = String(u.searchParams.get("token") || "");
+        if (tokenValue) {
+          const sessions = await loadSessions();
+          const session = sessions[tokenValue];
+          if (session && session.admin) {
+            const id = String(u.searchParams.get("id") || "");
+            if (!id) {
+              res.status(400).json({ error: "bad_request" });
+              return;
+            }
+            const posts = (await kvGet(POSTS_KEY, [])) || [];
+            const post = Array.isArray(posts) ? posts.find(p => String(p.id) === id) : null;
+            if (!post) {
+              res.status(404).json({ error: "not_found" });
+              return;
+            }
+            const baseUrl = baseUrlFromReq(req);
+            res.status(200).json({ post: await normalizePost(post, baseUrl) });
+            return;
+          }
+        }
+        res.status(503).json({ error: "caw_board_closed", reason: siteReason });
+        return;
+      }
       const id = String(u.searchParams.get("id") || "");
       if (!id) {
         res.status(400).json({ error: "bad_request" });
@@ -671,7 +725,15 @@ export default async function handler(req, res) {
       });
       return;
     }
+    if (req.method === "GET" && action === "site_status") {
+      res.status(200).json({ ok: true, closed: siteClosed, reason: siteReason });
+      return;
+    }
     if (req.method === "POST" && action === "signup") {
+      if (siteClosed) {
+        res.status(503).json({ error: "caw_board_closed", reason: siteReason });
+        return;
+      }
       const bannedByIp = await enforceBan(req, "");
       if (bannedByIp.blocked) {
         res.status(bannedByIp.code).json({ error: bannedByIp.error });
@@ -796,6 +858,12 @@ export default async function handler(req, res) {
         res.status(banned.code).json({ error: banned.error });
         return;
       }
+      if (siteClosed && !session.admin) {
+        delete sessions[tokenValue];
+        await kvSet(SESSIONS_KEY, sessions);
+        res.status(503).json({ error: "caw_board_closed", reason: siteReason });
+        return;
+      }
       res.status(200).json({ ok: true, user: session.user, admin: !!session.admin });
       return;
     }
@@ -821,6 +889,10 @@ export default async function handler(req, res) {
       const session = sessions[tokenValue];
       if (!session || !session.user) {
         res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      if (siteClosed && !session.admin) {
+        res.status(503).json({ error: "caw_board_closed", reason: siteReason });
         return;
       }
       const banned = await enforceBan(req, session.user);
@@ -906,6 +978,10 @@ export default async function handler(req, res) {
         res.status(401).json({ error: "unauthorized" });
         return;
       }
+      if (siteClosed && !session.admin) {
+        res.status(503).json({ error: "caw_board_closed", reason: siteReason });
+        return;
+      }
       const banned = await enforceBan(req, session.user);
       if (banned.blocked) {
         delete sessions[tokenValue];
@@ -949,6 +1025,10 @@ export default async function handler(req, res) {
       const session = sessions[tokenValue];
       if (!session || !session.user) {
         res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      if (siteClosed && !session.admin) {
+        res.status(503).json({ error: "caw_board_closed", reason: siteReason });
         return;
       }
       const banned = await enforceBan(req, session.user);
@@ -1017,6 +1097,10 @@ export default async function handler(req, res) {
       const session = sessions[tokenValue];
       if (!session || !session.user) {
         res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      if (siteClosed && !session.admin) {
+        res.status(503).json({ error: "caw_board_closed", reason: siteReason });
         return;
       }
       let posts = (await kvGet(POSTS_KEY, [])) || [];
@@ -1253,6 +1337,28 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true, bannedUser: username });
       return;
     }
+    if (req.method === "POST" && action === "admin_set_site_status") {
+      const tokenValue = String(body?.token || "");
+      const closed = !!body?.closed;
+      const reason = cleanReason(body?.reason || "");
+      if (!tokenValue) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const sessions = await loadSessions();
+      const session = sessions[tokenValue];
+      if (!session || !session.admin) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const ok = await kvSet(SITE_STATUS_KEY, { closed, reason, updated: now() });
+      if (!ok) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, closed, reason });
+      return;
+    }
     if (req.method === "POST" && action === "admin_users") {
       const tokenValue = String(body?.token || "");
       if (!tokenValue) {
@@ -1366,7 +1472,7 @@ export default async function handler(req, res) {
       return;
     }
     res.status(400).json({ error: "unknown_action" });
-  } catch {
+  } catch (e) {
     res.status(500).json({ error: "server_error" });
   }
 }
