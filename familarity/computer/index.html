@@ -39,13 +39,34 @@
 const su=["/smlwiki/laptop/pianos01.ogg","/smlwiki/laptop/pianos02.ogg","/smlwiki/laptop/pwr01.ogg","/bin.l/fcked.opus"];function pu(p){p.forEach(p=>{let o=new Audio;o.src=p})}pu(su); const iframe = document.querySelector('iframe');
 const amb=new Audio("/smlwiki/laptop/computeroom.opus");setTimeout(()=>{amb.play()},256),amb.loop=!0;const pwr01=new Audio("/smlwiki/laptop/pwr01.ogg"),pwr02=new Audio("/smlwiki/laptop/pwr02.ogg"),pwr03=new Audio("/bin.s/pwr03.ogg"),pwr04=new Audio("/bin.s/pwr04.ogg"),prg01=new Audio("/smlwiki/laptop/minimise.opus"),prg02=new Audio("/smlwiki/laptop/focus.ogg"),prg03=new Audio("/smlwiki/laptop/beep.opus"),prg04=new Audio("/smlwiki/laptop/sound03.ogg"),prg05=new Audio("/smlwiki/laptop/paper.opus");pwr02.play();
 function gettime(){let t=new Date,e=t.getHours(),l=t.getMinutes(),c=e>=12?"PM":"AM";return e%=12,(e=e||12)+":"+(l<10?"0"+l:l)+" "+c}function updateclock(){let t=gettime();document.querySelectorAll(".td").forEach(e=>{let l=t;"time"!==e.id&&1===t.split(":")[0].length&&(l="0"+l),e.textContent=l})}setInterval(updateclock,1e3),updateclock();
-function updateiframe(t){iframe.src=t,azbl(t);traction("CPU", 4, 128),traction("Net.", 7, 768)}function USB(){iframe.src!=="about:blank"&&(searchbar.value=iframe.src)}function handleSearchInput(t){if("Enter"===t.key){t.preventDefault();let e=searchbar.value.trim();if(!e)return;e.startsWith("https://")||e.startsWith("http://")||(e="https://"+e);updateiframe(e);searchbar.value=e;localStorage.setItem("dbt",e);}}searchbar.addEventListener('keypress', handleSearchInput);
+let currentUrl="";
+function normalizeUrl(value){
+  let url=String(value||"").trim();
+  if(!url)return "";
+  if(!url.startsWith("https://")&&!url.startsWith("http://"))url="https://"+url;
+  return url;
+}
+function proxyUrl(url){
+  return `/api/caw-board?action=proxy&url=${encodeURIComponent(url)}`;
+}
+function openUrl(value){
+  const url=normalizeUrl(value);
+  if(!url)return;
+  currentUrl=url;
+  searchbar.value=url;
+  localStorage.setItem("dbt",url);
+  updateiframe(proxyUrl(url));
+}
+function updateiframe(t){iframe.src=t,azbl(t);traction("CPU", 4, 128),traction("Net.", 7, 768)}
+function USB(){if(currentUrl)searchbar.value=currentUrl}
+function handleSearchInput(t){if("Enter"===t.key){t.preventDefault();openUrl(searchbar.value)}}
+searchbar.addEventListener('keypress', handleSearchInput);
 function azbl(e){let t="",c="";try{let n=new URL(e);t=n.pathname,c=n.hostname}catch(l){}t.includes("frontend/cd/")||t.includes("rancid/watch")?iframe.style.zoom="100%":c.includes("lancewatch.com")?iframe.style.zoom="70%":iframe.style.zoom="50%"};iframe.onload=()=>{try{azbl(iframe.contentWindow.location.href)}catch{}};
 let burneropened=false,burnerframe=document.querySelector("#brner iframe"),mainframe=document.getElementById("iframe"); document.addEventListener("contextmenu",e=>e.preventDefault());window.addEventListener("message",e=>{"girls"===e.data&&localStorage.setItem("girl",!0)});document.querySelector("#zxplyr iframe").src='about:blank';
 function shutdown(){laptop.style.filter="brightness(.69)contrast(1)",document.getElementById("screen").style[S_d]="none",powerdownscreen.style[S_d]="block",pwr04.play(),pwr03.play(),amb.pause(),amb.loop=!1,document.querySelector("#zxplyr iframe").src="about:blank",mainframe.src="about:blank",burnerframe.src='about:blank',setTimeout(function(){window.location.href="/"},3256)}
 function pC_p(){poweroff.style[S_d]="none"}function pO_p(){poweroff.style[S_d]="flex",pwr01.play()}
 function pC_b(){browser.style[S_d]="none",mainframe.src="about:blank"}
-function pO_b(){browser.style[S_d]="flex",localStorage.setItem("compvis","true"),traction("Net.",6,1024),traction("CPU",5,768);let e=localStorage.getItem("dbt")||"/madden";"about:blank"===mainframe.src&&(mainframe.src=e),USB()}
+function pO_b(){browser.style[S_d]="flex",localStorage.setItem("compvis","true"),traction("Net.",6,1024),traction("CPU",5,768);let e=localStorage.getItem("dbt")||searchbar.value||"https://crowthecrow.com/";if(mainframe.src==="about:blank"){openUrl(e)}USB()}
 function pC_n(){noter.style[S_d]="none"}
 function pO_n(){noter.style[S_d]="flex",traction("CPU",4,128),traction("Disk",7,512)}
 function pC_c(){cmd.style[S_d]="none",document.querySelector("#cmd iframe").src="/smlwiki/laptop/terus-frontend/termina/user.html"}
