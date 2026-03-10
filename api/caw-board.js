@@ -1435,9 +1435,7 @@ export default async function handler(req, res) {
       const users = (await kvGet(USERS_KEY, {})) || {};
       const list = Object.entries(users).map(([user, info]) => ({
         user,
-        created: Number(info?.created || 0),
-        password: info?.hash || "",
-        ip: info?.signupIp || ""
+        created: Number(info?.created || 0)
       }));
       list.sort((a, b) => b.created - a.created);
       res.status(200).json({ ok: true, users: list });
