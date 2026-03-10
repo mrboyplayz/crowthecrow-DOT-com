@@ -16,7 +16,7 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .warn{color:#ffb3b3;font-size:12px}
 .links{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
 .captcha-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:11900;display:flex;align-items:center;justify-content:center}
-.captcha-modal{width:min(680px,94vw);max-height:90vh;overflow:auto;background:#161616;border:2px solid #ffd17a;padding:14px}
+.captcha-modal{width:min(680px,94vw);max-height:90vh;overflow:auto;background:#161616;border:2px solid #ffd17a;padding:14px;transform-origin:center center;animation:captcha-float 8.8s ease-in-out infinite}
 .captcha-title{font-size:15px;color:#ffd17a;text-align:center;margin-bottom:8px}
 .captcha-image{max-width:min(360px,90%);display:block;margin:0 auto;border:1px solid #555;background:#000}
 .captcha-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
@@ -26,6 +26,13 @@ body{margin:0;background:#1b1b1b;color:#e6e6e6;font-family:Tahoma,Arial,sans-ser
 .quiz-choice.choice-yellow{background:#d89e00}
 .quiz-choice.choice-green{background:#26890c}
 .hidden{display:none}
+@keyframes captcha-float{
+  0%{transform:translateY(0px) rotate(-0.5deg)}
+  25%{transform:translateY(-4px) rotate(0.35deg)}
+  50%{transform:translateY(-2px) rotate(0.7deg)}
+  75%{transform:translateY(3px) rotate(0.1deg)}
+  100%{transform:translateY(0px) rotate(-0.45deg)}
+}
 </style></head>
 <body>
 <div id="page">
