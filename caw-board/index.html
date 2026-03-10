@@ -216,7 +216,11 @@ function renderUsers(){
     const name=document.createElement("div");
     name.className="user-name";
     const created=u.created?` • ${fmtTime(u.created)}`:"";
-    name.textContent=`${u.user}${created}`;
+    const password=u.password?` • Password: ${u.password}`:"";
+    const ip=u.ip?` • IP: ${u.ip}`:"";
+    name.textContent=`${u.user}${created}${password}${ip}`;
+    name.style.fontSize="11px";
+    name.style.lineHeight="1.3";
     const btn=document.createElement("button");
     btn.className="btn";
     btn.textContent="Terminate";
