@@ -26,6 +26,7 @@ body:before{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .preview-desc{font-size:12px;color:#e0e0e0;white-space:pre-wrap;margin-top:6px}
 .preview-media{max-width:100%;border:1px solid #3d3424;background:#000;display:block;width:100%;height:auto}
 .captcha-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:11900;display:flex;align-items:center;justify-content:center}
+.captcha-modal-wrap{will-change:transform}
 .captcha-modal{width:min(560px,94vw);max-height:90vh;overflow:auto;background:#161616;border:2px solid #ffd17a;padding:14px;transform-origin:center center;animation:captcha-float 8.8s ease-in-out infinite}
 .captcha-title{font-size:15px;color:#ffd17a;text-align:center;margin-bottom:8px}
 .captcha-image{max-width:min(360px,90%);display:block;margin:0 auto;border:1px solid #555;background:#000}
@@ -193,6 +194,19 @@ function playCorrectSound(){
   correctAudio.currentTime=0;
   correctAudio.play().catch(()=>{});
 }
+async function bumpCaptchaModal(){
+  const wrap=qs(".captcha-modal-wrap");
+  if(!wrap)return;
+  const anim=wrap.animate(
+    [
+      {transform:"translateY(0px)"},
+      {transform:"translateY(18px)",offset:0.45},
+      {transform:"translateY(0px)"}
+    ],
+    {duration:300,easing:"ease-in-out"}
+  );
+  await anim.finished.catch(()=>{});
+}
 function stopQuizAudio(){
   if(!quizAudio)return;
   quizAudio.pause();
@@ -204,7 +218,7 @@ function ensureCaptchaModal(){
   overlay=document.createElement("div");
   overlay.id="captcha-overlay";
   overlay.className="captcha-overlay";
-  overlay.innerHTML=`<div class="captcha-modal"><div id="captcha-modal-content"></div></div>`;
+  overlay.innerHTML=`<div class="captcha-modal-wrap"><div class="captcha-modal"><div id="captcha-modal-content"></div></div></div>`;
   document.body.appendChild(overlay);
   return overlay;
 }
@@ -305,6 +319,7 @@ async function submitQuizAnswer(){
   const data=await apiPost("quiz_answer",{quizId:state.quizId,answer});
   if(data&&data.ok&&data.done&&data.passToken){
     playCorrectSound();
+    await bumpCaptchaModal();
     stopQuizAudio();
     clearQteOverlay();
     state.captchaPassToken=String(data.passToken);
@@ -316,6 +331,7 @@ async function submitQuizAnswer(){
   }
   if(data&&data.ok&&!data.done){
     playCorrectSound();
+    await bumpCaptchaModal();
     if(submitBtn)submitBtn.disabled=false;
     setCaptchaInlineStatus("");
     setStatus("");

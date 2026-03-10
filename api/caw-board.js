@@ -69,6 +69,7 @@ export default async function handler(req, res) {
   const CAPTCHA_QUIZ_COUNT = 5;
   const CAPTCHA_QUESTIONS = [
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jerryshop/jerry.png", answers: ["jerry"] },
+    { prompt: "Who is this SML Character?", image: "/caw-content/Jeffy.webp", answers: ["jeffy"] },
     {
       prompt: "When was Crow's ZCity first made?",
       image: "/pluv/crowpluv.png",
@@ -111,11 +112,18 @@ export default async function handler(req, res) {
       answers: ["to do nothing and be annoying all the time"],
       choices: ["to do nothing and be annoying all the time", "controlled by datze", "an amazing bot that makes the chat lively"]
     },
+    {
+      prompt: "How much playtime does CROW have on Garry's Mod?",
+      image: "/caw-content/playtime.png",
+      answers: ["Around 2000 hours"],
+      choices: ["Around 2000 hours", "Below 2000 hours", "Above 3000 hours", "Below 200 hours"]
+    },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/marvin.jpg", answers: ["marvin", "mario"] },
-    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/brokenguy.webp", answers: ["brooklyn guy", "brooklynguy", "brooklyn t guy"] },
+    { prompt: "Who is this SML Character?", image: "/caw-content/brooky.webp", answers: ["brooklyn guy", "brooklynguy", "brooklyn t guy"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/juniorr.jpg", answers: ["junior", "bowser junior", "god"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jos.webp", answers: ["joseph"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/cody.jpg", answers: ["cody"] },
+    { prompt: "Who is this SML Character?", image: "/caw-content/judy.webp", answers: ["judy", "judy nutkiss"] },
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/chefpay.webp", answers: ["chef pee pee", "chefpeepee", "chef peepee", "chef penis"] },
     { prompt: "Who is this ??? Character?", image: "/caw-content/FASHION.jpg", answers: ["fashion new year"] },
   ];
