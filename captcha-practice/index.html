@@ -152,7 +152,7 @@ function renderQuestion(question){
   state.quizTotal=Number(question.total||1);
   const choices=Array.isArray(question.choices)?question.choices:[];
   const wrap=qs("#captcha-wrap");
-  wrap.innerHTML=`<div class="captcha-modal-wrap"><div class="captcha-modal"><div class="captcha-title">Question ${state.quizIndex}/${state.quizTotal}: ${question.prompt||""}</div><img class="captcha-image" src="${question.image||""}"><div id="quiz-choices" class="captcha-choices"></div><input id="quiz-answer" class="input" placeholder="${choices.length?"or type your own answer":"type answer"}" style="margin-top:8px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:8px">Submit Answer</button><div id="inline-status" class="muted" style="margin-top:6px"></div></div></div>`;
+  wrap.innerHTML=`<div class="captcha-modal-wrap"><div class="captcha-modal"><div class="captcha-title">Question ${state.quizIndex}/${state.quizTotal}: ${question.prompt||""}</div>${question.hint?`<div class="muted" style="text-align:center;margin-top:-4px;margin-bottom:6px">Hint: ${question.hint}</div>`:""}<img class="captcha-image" src="${question.image||""}"><div id="quiz-choices" class="captcha-choices"></div><input id="quiz-answer" class="input" placeholder="${choices.length?"or type your own answer":"type answer"}" style="margin-top:8px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:8px">Submit Answer</button><div id="inline-status" class="muted" style="margin-top:6px"></div></div></div>`;
   const input=qs("#quiz-answer");
   input.focus();
   input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();submitAnswer();}};

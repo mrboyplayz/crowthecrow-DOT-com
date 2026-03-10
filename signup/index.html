@@ -61,6 +61,9 @@ const LS=localStorage;
 const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.crowthecrow.com")?"https://crowthecrow-dot-com.vercel.app":"";
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEY="caw_session_token";
+const CAPTCHA_PASS_TTL_MS=5*60*1000;
+const CAPTCHA_PASS_TOKEN_KEY="caw_captcha_pass_token";
+const CAPTCHA_PASS_TS_KEY="caw_captcha_pass_ts";
 const quizState={id:"",passToken:"",questionIndex:0,total:5};
 const FAIL_VIDEO_URL="/caw-content/sonothalal.mp4";
 const FAIL_REDIRECT_URL="https://zanryth.xyz/";
@@ -73,6 +76,22 @@ let correctAudio=null;
 let qteTimer=0;
 let qteHandler=null;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
+function saveCaptchaPassToken(token){
+  if(token){
+    LS.setItem(CAPTCHA_PASS_TOKEN_KEY,token);
+    LS.setItem(CAPTCHA_PASS_TS_KEY,String(Date.now()));
+  }else{
+    LS.removeItem(CAPTCHA_PASS_TOKEN_KEY);
+    LS.removeItem(CAPTCHA_PASS_TS_KEY);
+  }
+}
+function loadCaptchaPassToken(){
+  const token=LS.getItem(CAPTCHA_PASS_TOKEN_KEY)||"";
+  const ts=Number(LS.getItem(CAPTCHA_PASS_TS_KEY)||0);
+  if(!token||!Number.isFinite(ts)){saveCaptchaPassToken("");return ""}
+  if(Date.now()-ts>CAPTCHA_PASS_TTL_MS){saveCaptchaPassToken("");return ""}
+  return token;
+}
 async function apiPost(action,body){
   const url=new URL(apiUrl,location.origin);
   url.searchParams.set("action",action);
@@ -214,7 +233,7 @@ function renderQuiz(question){
   quizState.questionIndex=Number(question.index||1);
   quizState.total=Number(question.total||5);
   const choices=Array.isArray(question.choices)?question.choices:[];
-  wrap.innerHTML=`<div class="captcha-title">Question ${quizState.questionIndex}/${quizState.total}: ${question.prompt||""}</div><img id="quiz-image" class="captcha-image" src="${question.image||""}"><div id="quiz-choices" class="captcha-choices"></div><input id="quiz-answer" class="input" placeholder="${choices.length?"or type your own answer":"type answer"}" style="margin-top:8px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:8px">Submit Answer</button><div id="captcha-inline-status" class="muted" style="margin-top:6px"></div>`;
+  wrap.innerHTML=`<div class="captcha-title">Question ${quizState.questionIndex}/${quizState.total}: ${question.prompt||""}</div>${question.hint?`<div class="muted" style="text-align:center;margin-top:-4px;margin-bottom:6px">Hint: ${question.hint}</div>`:""}<img id="quiz-image" class="captcha-image" src="${question.image||""}"><div id="quiz-choices" class="captcha-choices"></div><input id="quiz-answer" class="input" placeholder="${choices.length?"or type your own answer":"type answer"}" style="margin-top:8px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:8px">Submit Answer</button><div id="captcha-inline-status" class="muted" style="margin-top:6px"></div>`;
   const input=qs("#quiz-answer");
   if(input){
     input.focus();
@@ -281,6 +300,7 @@ async function submitQuizAnswer(){
     stopQuizAudio();
     clearQteOverlay();
     quizState.passToken=String(data.passToken);
+    saveCaptchaPassToken(quizState.passToken);
     qs("#recaptcha-wrap").innerHTML="";
     hideCaptchaModal();
     setCaptchaInlineStatus("");
@@ -305,6 +325,7 @@ async function submitQuizAnswer(){
     if(submitBtn)submitBtn.disabled=false;
     setCaptchaInlineStatus("captcha expired");
     setStatus("captcha expired");
+    saveCaptchaPassToken("");
     renderQuizStartPrompt();
     return;
   }
@@ -316,12 +337,16 @@ async function signup(){
   const u=qs("#signup-user").value.trim();
   const p=qs("#signup-pass").value;
   const p2=qs("#signup-pass2").value;
-  if(!u||!p||p!==p2||u.length<3||p.length<6||!quizState.passToken){setStatus("invalid signup");return}
+  if(!quizState.passToken)quizState.passToken=loadCaptchaPassToken();
+  if(!u||!p||p!==p2||u.length<3||p.length<6||!quizState.passToken){setStatus("invalid signup");renderQuizStartPrompt();return}
   setStatus("");
   const payload={username:u,password:p,captchaPassToken:quizState.passToken};
   const resp=await apiPost("signup",payload);
   if(!resp||!resp.token){
     setStatus(signupError(resp?.error));
+    if(resp?.error==="captcha_required"||resp?.error==="captcha_invalid"||resp?.error==="captcha_expired"){
+      saveCaptchaPassToken("");
+    }
     renderQuizStartPrompt();
     return;
   }
@@ -334,8 +359,17 @@ async function refreshSession(){
   const data=await apiPost("session",{token});
   if(data&&data.user){location.href="/caw-board/";}
 }
+function initCaptcha(){
+  const saved=loadCaptchaPassToken();
+  if(saved){
+    quizState.passToken=saved;
+    setStatus("captcha cooldown active");
+    return;
+  }
+  renderQuizStartPrompt();
+}
 qs("#signup-btn").onclick=signup;
 refreshSession();
-renderQuizStartPrompt();
+initCaptcha();
 </script>
 </body></html>

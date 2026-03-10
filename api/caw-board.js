@@ -66,67 +66,76 @@ export default async function handler(req, res) {
   const COMMENT_BURST_COUNT = 4;
   const COMMENT_COOLDOWN_MS = 40 * 1000;
   const CAPTCHA_TTL_MS = 5 * 60 * 1000;
-  const CAPTCHA_PASS_TTL_MS = 10 * 60 * 1000;
+  const CAPTCHA_PASS_TTL_MS = 5 * 60 * 1000;
   const CAPTCHA_QUIZ_COUNT = 5;
   const CAPTCHA_QUESTIONS = [
-    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jerryshop/jerry.png", answers: ["jerry"] },
-    { prompt: "Who is this SML Character?", image: "/caw-content/Jeffy.webp", answers: ["jeffy"] },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jerryshop/jerry.png", answers: ["jerry"], hint: "look at his shirt, different from the other lookalike" },
+    { prompt: "Who is this SML Character?", image: "/caw-content/Jeffy.webp", answers: ["jeffy"], hint: "he seems retarded" },
     {
       prompt: "When was Crow's ZCity first made?",
       image: "/pluv/crowpluv.png",
       answers: ["october 1st", "october 1st 2025", "2025/10/1"],
-      choices: ["October 1st 2025", "January 5th 2024", "March 10th 2026", "June 1st 2023"]
+      choices: ["October 1st 2025", "January 5th 2024", "March 10th 2026", "June 1st 2023"],
+      hint: "It was in 2025"
     },
     {
       prompt: "When was Saudi Arabia first created?",
       image: "/caw-content/saudi.png",
       answers: ["September 23, 1932", "1932", "sep 23 1932"],
-      choices: ["September 23, 1932", "September 23, 1923", "January 1, 1900", "December 10, 1945"]
+      choices: ["September 23, 1932", "September 23, 1923", "January 1, 1900", "December 10, 1945"],
+      hint: "it's higher than 1923"
     },
     {
       prompt: "What was the first episode that jeffy was in?",
       image: "/caw-content/SMLLogo.webp",
       answers: ["Mario The Babysitter", "Mario The Babysitter!"],
-      choices: ["Mario The Babysitter", "The Big Arch!", "Koopa's New Job", "Charleyyy and Friends"]
+      choices: ["Mario The Babysitter", "The Big Arch!", "Koopa's New Job", "Charleyyy and Friends"],
+      hint: "Related to mario"
     },
     {
       prompt: "Who was the first person to nuke Crow's ZCity?",
       image: "/caw-content/pluvia.mp4",
       answers: ["John Crust", "d1o_da"],
-      choices: ["John Crust", "kazoo", "grandpa", "kliv"]
+      choices: ["John Crust", "kazoo", "grandpa", "kliv"],
+      hint: "johnny"
     },
     {
       prompt: "who is a pervert",
       image: "/caw-content/pluvia.mp4",
       answers: ["jon"],
-      choices: ["Freakpool", "jon"]
+      choices: ["Freakpool", "jon"],
+      hint: "who seems more worse"
     },
     {
       prompt: "what is freakpool's favorite game",
       image: "/smlwiki/jerryshop/jerry.png",
       answers: ["FarmD", "both"],
-      choices: ["FarmD", "tasque manager NSFW MODEL GARRY'S MOD", "both"]
+      choices: ["FarmD", "tasque manager NSFW MODEL GARRY'S MOD", "both"],
+      hint: "it's something with a f"
     },
     {
       prompt: "What is Grok's purpose (discord bot)?",
       image: "/caw-content/grok.png",
       answers: ["to do nothing and be annoying all the time"],
-      choices: ["to do nothing and be annoying all the time", "controlled by datze", "an amazing bot that makes the chat lively"]
+      choices: ["to do nothing and be annoying all the time", "controlled by datze", "an amazing bot that makes the chat lively"],
+      hint: "If you've looked at the crow's zcity server you would know the answer"
     },
     {
       prompt: "How much playtime does CROW have on Garry's Mod?",
       image: "/caw-content/playtime.png",
       answers: ["Around 2000 hours"],
-      choices: ["Around 2000 hours", "Below 2000 hours", "Above 3000 hours", "Below 200 hours"]
+      choices: ["Around 2000 hours", "Below 2000 hours", "Above 3000 hours", "Below 200 hours"],
+      hint: "it's above 1500 hours"
     },
-    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/marvin.jpg", answers: ["marvin", "mario"] },
-    { prompt: "Who is this SML Character?", image: "/caw-content/brooky.webp", answers: ["brooklyn guy", "brooklynguy", "brooklyn t guy"] },
-    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/juniorr.jpg", answers: ["junior", "bowser junior", "god"] },
-    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jos.webp", answers: ["joseph"] },
-    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/cody.jpg", answers: ["cody"] },
-    { prompt: "Who is this SML Character?", image: "/caw-content/judy.webp", answers: ["judy", "judy nutkiss"] },
-    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/chefpay.webp", answers: ["chef pee pee", "chefpeepee", "chef peepee", "chef penis"] },
-    { prompt: "Who is this ??? Character?", image: "/caw-content/FASHION.jpg", answers: ["fashion new year"] },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/marvin.jpg", answers: ["marvin", "mario"], hint: "Mario's new name" },
+    { prompt: "Who is this SML Character?", image: "/caw-content/brooky.webp", answers: ["brooklyn guy", "brooklynguy", "brooklyn t guy"], hint: "Has Brooklyn in name" },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/juniorr.jpg", answers: ["junior", "bowser junior", "god"], hint: "Bowser's son" },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jos.webp", answers: ["joseph"], hint: "Junior's friend" },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/cody.jpg", answers: ["cody"], hint: "The gay one" },
+    { prompt: "Who is this SML Character?", image: "/caw-content/judy.webp", answers: ["judy", "judy nutkiss"], hint: "Nutkiss" },
+    { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/chefpay.webp", answers: ["chef pee pee", "chefpeepee", "chef peepee", "chef penis"], hint: "CHEF ___ ___'S IN THE KITCHEN IM THE KING OF COOKING THINGS!" },
+    { prompt: "Who is this ??? Character?", image: "/caw-content/FASHION.jpg", answers: ["fashion new year"], hint: "fashion new year (that's actually his name)" },
+    { prompt: "Who is this SML Character?", image: "/caw-content/goodman.webp", answers: ["mr goodman", "goodman", "elephant asshole guy"], hint: "Mr. G_____" },
   ];
   const CAW_BOARD_CLOSED = false;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
@@ -349,7 +358,8 @@ export default async function handler(req, res) {
       total: quiz.questions.length,
       prompt: String(item?.prompt || "Who is this character?"),
       image: String(item?.image || ""),
-      choices: Array.isArray(item?.choices) ? item.choices.map(v => String(v || "")).filter(Boolean) : []
+      choices: Array.isArray(item?.choices) ? item.choices.map(v => String(v || "")).filter(Boolean) : [],
+      hint: String(item?.hint || "")
     };
   }
   function shuffleArray(list) {
@@ -363,16 +373,20 @@ export default async function handler(req, res) {
     return next;
   }
   function pickQuizQuestions() {
-    const pool = CAPTCHA_QUESTIONS.map(item => ({
-      prompt: String(item?.prompt || ""),
-      image: String(item?.image || ""),
-      answers: Array.isArray(item?.answers) ? item.answers.map(normalizeQuizAnswer).filter(Boolean) : [],
-      choices: shuffleArray(
-        Array.isArray(item?.choices)
-          ? item.choices.map(v => String(v || "").trim()).filter(Boolean)
-          : []
-      )
-    })).filter(item => item.prompt && item.answers.length);
+    const pool = CAPTCHA_QUESTIONS.map(item => {
+      const rawAnswers = Array.isArray(item?.answers) ? item.answers.map(v => String(v || "").trim()).filter(Boolean) : [];
+      return {
+        prompt: String(item?.prompt || ""),
+        image: String(item?.image || ""),
+        answers: rawAnswers.map(normalizeQuizAnswer).filter(Boolean),
+        choices: shuffleArray(
+          Array.isArray(item?.choices)
+            ? item.choices.map(v => String(v || "").trim()).filter(Boolean)
+            : []
+        ),
+        hint: String(item?.hint || "").trim()
+      };
+    }).filter(item => item.prompt && item.answers.length);
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       const tmp = pool[i];
@@ -759,7 +773,6 @@ export default async function handler(req, res) {
       if (!passToken) return { ok: false, error: "captcha_required", code: 400 };
       const key = captchaPassKey(passToken);
       const pass = await kvGet(key, null);
-      await kvDel(key);
       if (!pass || typeof pass !== "object") return { ok: false, error: "captcha_invalid", code: 400 };
       const age = now() - Number(pass.ts || 0);
       if (!Number.isFinite(age) || age > CAPTCHA_PASS_TTL_MS) return { ok: false, error: "captcha_expired", code: 400 };

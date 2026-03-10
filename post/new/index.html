@@ -86,6 +86,9 @@ const apiBase=(location.hostname==="crowthecrow.com"||location.hostname==="www.c
 const apiUrl=apiBase?`${apiBase}/api/caw-board`:"/api/caw-board";
 const KEY="caw_session_token";
 const CAW_BOARD_CLOSED=false;
+const CAPTCHA_PASS_TTL_MS=5*60*1000;
+const CAPTCHA_PASS_TOKEN_KEY="caw_captcha_pass_token";
+const CAPTCHA_PASS_TS_KEY="caw_captcha_pass_ts";
 const state={token:"",previewTimer:0,quizId:"",quizIndex:0,quizTotal:5,captchaPassToken:""};
 const FAIL_VIDEO_URL="/caw-content/sonothalal.mp4";
 const FAIL_REDIRECT_URL="https://zanryth.xyz/";
@@ -100,6 +103,22 @@ let qteHandler=null;
 const MAX_UPLOAD=4718592;
 const MEDIA_MAX_CHARS=900000;
 function setStatus(text){const s=qs("#status");if(s)s.textContent=text||""}
+function saveCaptchaPassToken(token){
+  if(token){
+    LS.setItem(CAPTCHA_PASS_TOKEN_KEY,token);
+    LS.setItem(CAPTCHA_PASS_TS_KEY,String(Date.now()));
+  }else{
+    LS.removeItem(CAPTCHA_PASS_TOKEN_KEY);
+    LS.removeItem(CAPTCHA_PASS_TS_KEY);
+  }
+}
+function loadCaptchaPassToken(){
+  const token=LS.getItem(CAPTCHA_PASS_TOKEN_KEY)||"";
+  const ts=Number(LS.getItem(CAPTCHA_PASS_TS_KEY)||0);
+  if(!token||!Number.isFinite(ts)){saveCaptchaPassToken("");return ""}
+  if(Date.now()-ts>CAPTCHA_PASS_TTL_MS){saveCaptchaPassToken("");return ""}
+  return token;
+}
 function showProgress(value){
   const el=qs("#upload-progress");
   if(!el)return;
@@ -148,7 +167,7 @@ function renderQuiz(question){
   state.quizIndex=Number(question.index||1);
   state.quizTotal=Number(question.total||5);
   const choices=Array.isArray(question.choices)?question.choices:[];
-  wrap.innerHTML=`<div class="captcha-title">Question ${state.quizIndex}/${state.quizTotal}: ${question.prompt||""}</div><img id="quiz-image" class="captcha-image" src="${question.image||""}"><div id="quiz-choices" class="captcha-choices"></div><input id="quiz-answer" class="input" placeholder="${choices.length?"or type your own answer":"type answer"}" style="margin-top:6px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:6px">Submit Answer</button><div id="captcha-inline-status" class="muted" style="margin-top:6px"></div>`;
+  wrap.innerHTML=`<div class="captcha-title">Question ${state.quizIndex}/${state.quizTotal}: ${question.prompt||""}</div>${question.hint?`<div class="muted" style="text-align:center;margin-top:-4px;margin-bottom:6px">Hint: ${question.hint}</div>`:""}<img id="quiz-image" class="captcha-image" src="${question.image||""}"><div id="quiz-choices" class="captcha-choices"></div><input id="quiz-answer" class="input" placeholder="${choices.length?"or type your own answer":"type answer"}" style="margin-top:6px"><button id="quiz-answer-btn" class="btn" type="button" style="margin-top:6px">Submit Answer</button><div id="captcha-inline-status" class="muted" style="margin-top:6px"></div>`;
   const input=qs("#quiz-answer");
   if(input){
     input.focus();
@@ -325,6 +344,7 @@ async function submitQuizAnswer(){
     stopQuizAudio();
     clearQteOverlay();
     state.captchaPassToken=String(data.passToken);
+    saveCaptchaPassToken(state.captchaPassToken);
     qs("#recaptcha-wrap").innerHTML="";
     hideCaptchaModal();
     setCaptchaInlineStatus("");
@@ -349,6 +369,7 @@ async function submitQuizAnswer(){
     if(submitBtn)submitBtn.disabled=false;
     setCaptchaInlineStatus("captcha expired");
     setStatus("captcha expired");
+    saveCaptchaPassToken("");
     renderQuizStartPrompt();
     return;
   }
@@ -394,7 +415,8 @@ async function refreshSession(){
   }
 }
 async function postFromFile(file,type,title,description){
-  if(!state.captchaPassToken){setStatus("captcha required");return}
+  if(!state.captchaPassToken){state.captchaPassToken=loadCaptchaPassToken()}
+  if(!state.captchaPassToken){setStatus("captcha required");renderQuizStartPrompt();return}
   if(file.size>MAX_UPLOAD){setStatus("file too big for server upload, use URL");return}
   const estimatedChars=Math.ceil(file.size*4/3)+100;
   if(estimatedChars>MEDIA_MAX_CHARS){setStatus("file too big for server upload, use URL");return}
@@ -407,15 +429,31 @@ async function postFromFile(file,type,title,description){
   const payload={token:state.token,title,description,type,url:dataUrl,captchaPassToken:state.captchaPassToken};
   const resp=await apiPost("create_post",payload,45000);
   const postId=resp?.post?.id||resp?.id||"";
-  if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));hideProgress();renderQuizStartPrompt();return}
+  if(!resp||resp.error||!postId){
+    if(resp?.error==="captcha_required"||resp?.error==="captcha_invalid"||resp?.error==="captcha_expired"||resp?.error==="captcha_wrong_answer"){
+      saveCaptchaPassToken("");
+    }
+    setStatus(statusFromError(resp?.error));
+    hideProgress();
+    renderQuizStartPrompt();
+    return;
+  }
   location.href=`/post/?id=${encodeURIComponent(postId)}`;
 }
 async function postFromUrl(url,type,title,description){
-  if(!state.captchaPassToken){setStatus("captcha required");return}
+  if(!state.captchaPassToken){state.captchaPassToken=loadCaptchaPassToken()}
+  if(!state.captchaPassToken){setStatus("captcha required");renderQuizStartPrompt();return}
   const payload={token:state.token,title,description,type,url,captchaPassToken:state.captchaPassToken};
   const resp=await apiPost("create_post",payload);
   const postId=resp?.post?.id||resp?.id||"";
-  if(!resp||resp.error||!postId){setStatus(statusFromError(resp?.error));renderQuizStartPrompt();return}
+  if(!resp||resp.error||!postId){
+    if(resp?.error==="captcha_required"||resp?.error==="captcha_invalid"||resp?.error==="captcha_expired"||resp?.error==="captcha_wrong_answer"){
+      saveCaptchaPassToken("");
+    }
+    setStatus(statusFromError(resp?.error));
+    renderQuizStartPrompt();
+    return;
+  }
   location.href=`/post/?id=${encodeURIComponent(postId)}`;
 }
 function deriveTitle({title,file,url}){
@@ -526,7 +564,13 @@ if(CAW_BOARD_CLOSED){
 }else{
   loadState();
   refreshSession();
-  renderQuizStartPrompt();
+  const saved=loadCaptchaPassToken();
+  if(saved){
+    state.captchaPassToken=saved;
+    setStatus("captcha cooldown active");
+  }else{
+    renderQuizStartPrompt();
+  }
 }
 </script>
 </body></html>
