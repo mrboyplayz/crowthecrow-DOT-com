@@ -263,13 +263,15 @@ async function runQteIfNeeded(){
   const overlay=document.createElement("div");
   overlay.id="qte-overlay";
   overlay.style.cssText=`position:fixed;left:${left}vw;top:${top}vh;z-index:13000;background:#0b0b0b;border:2px solid #f5c95d;padding:10px;max-width:240px`;
-  overlay.innerHTML=`<div class="label">QTE: press <b>${key.toUpperCase()}</b> in 4s</div>`;
+  overlay.innerHTML=`<div class="label">QTE: press <b>${key.toUpperCase()}</b> or tap button in 4s</div><button id="qte-tap-btn" class="btn" type="button" style="margin-top:8px">Press ${key.toUpperCase()}</button>`;
   document.body.appendChild(overlay);
   return await new Promise(resolve=>{
     const done=value=>{clearQteOverlay();resolve(value);};
     qteHandler=e=>{
       if(String(e.key||"").toLowerCase()===key){done(true);}
     };
+    const tapBtn=qs("#qte-tap-btn");
+    if(tapBtn)tapBtn.onclick=()=>done(true);
     window.addEventListener("keydown",qteHandler);
     qteTimer=setTimeout(()=>done(false),4000);
   });
