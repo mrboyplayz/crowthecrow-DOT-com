@@ -512,6 +512,19 @@ export default async function handler(req, res) {
       thinkingMode: thinking
     };
   }
+  function buildAislopStats(queue, presence) {
+    const list = Array.isArray(queue) ? queue : [];
+    let waiting = 0;
+    let assigned = 0;
+    for (const item of list) {
+      if (item?.status === "waiting") waiting++;
+      if (item?.status === "assigned") assigned++;
+    }
+    const entries = Object.values(presence || {}).filter(v => v && typeof v === "object");
+    const larpers = entries.filter(v => v.mode === "larp").length;
+    const prompters = entries.filter(v => v.mode !== "larp").length;
+    return { waiting, assigned, larpers, prompters };
+  }
   function isStoredMedia(urlField) {
     return String(urlField || "").startsWith("kv:");
   }
@@ -966,20 +979,26 @@ export default async function handler(req, res) {
       const ts = now();
       const users = (await kvGet(AISLOP_USERS_KEY, {})) || {};
       const user = ensureAislopUser(users, userId, ts);
+      const presenceRaw = (await kvGet(AISLOP_PRESENCE_KEY, {})) || {};
+      const { next: presence, changed: presenceChanged } = cleanupAislopPresence(presenceRaw, ts);
+      const queueRaw = (await kvGet(AISLOP_QUEUE_KEY, [])) || [];
+      const { queue, changed: queueChanged } = cleanupAislopQueue(queueRaw, presence, ts);
+      const stats = buildAislopStats(queue, presence);
       const changed = applyAislopRefill(user, ts);
-      if (changed) {
-        const okUsers = await kvSet(AISLOP_USERS_KEY, users);
-        if (!okUsers) {
-          res.status(500).json({ error: "kv_set_failed" });
-          return;
-        }
+      const okUsers = changed ? await kvSet(AISLOP_USERS_KEY, users) : true;
+      const okPresence = presenceChanged ? await kvSet(AISLOP_PRESENCE_KEY, presence) : true;
+      const okQueue = queueChanged ? await kvSet(AISLOP_QUEUE_KEY, queue) : true;
+      if (!okUsers || !okPresence || !okQueue) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
       }
       res.status(200).json({
         ok: true,
         userId,
         credits: Number(user.credits || 0),
         maxCredits: AISLOP_MAX_CREDITS,
-        retryAfterMs: aisLopRetryMs(user, ts)
+        retryAfterMs: aisLopRetryMs(user, ts),
+        stats
       });
       return;
     }
@@ -1012,7 +1031,7 @@ export default async function handler(req, res) {
         res.status(500).json({ error: "kv_set_failed" });
         return;
       }
-      res.status(200).json({ ok: true, task: formatAislopTask(assigned, presence) });
+      res.status(200).json({ ok: true, task: formatAislopTask(assigned, presence), stats: buildAislopStats(queue, presence) });
       return;
     }
     if (req.method === "POST" && action === "aislop_create_prompt") {
@@ -1072,7 +1091,8 @@ export default async function handler(req, res) {
         promptId: item.id,
         credits: Number(user.credits || 0),
         status: item.status,
-        assigned: !!assigned
+        assigned: !!assigned,
+        stats: buildAislopStats(queue, presence)
       });
       return;
     }
@@ -1102,7 +1122,7 @@ export default async function handler(req, res) {
         res.status(500).json({ error: "kv_set_failed" });
         return;
       }
-      res.status(200).json({ ok: true, task: formatAislopTask(task, presence) });
+      res.status(200).json({ ok: true, task: formatAislopTask(task, presence), stats: buildAislopStats(queue, presence) });
       return;
     }
     if (req.method === "POST" && action === "aislop_submit_response") {
@@ -1182,7 +1202,8 @@ export default async function handler(req, res) {
         retryAfterMs: aisLopRetryMs(user, ts),
         responseType: status === "answered" ? promptItem.responseType : "",
         responseText: status === "answered" ? promptItem.responseText : "",
-        responseImage: status === "answered" ? promptItem.responseImage : ""
+        responseImage: status === "answered" ? promptItem.responseImage : "",
+        stats: buildAislopStats(queue, presence)
       });
       return;
     }

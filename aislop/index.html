@@ -5,40 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>larp larp larp sahur</title>
   <style>
-    :root{--bg:#080b14;--panel:#101728;--line:#243454;--text:#eaf1ff;--muted:#8ca1cc;--hot:#6f9cff;--good:#6ce3ac;--warn:#ffcc7a}
+    @import url("https://fonts.googleapis.com/css2?family=Comic+Relief:wght@400;700&display=swap");
+    :root{--bg:#faf9f6;--panel:#ffffff;--line:#d6d0c2;--text:#1a1a1e;--muted:#6d6d74;--hot:#8d3bff;--good:#198754;--warn:#b25f00;--shadow:0 2px 10px rgba(0,0,0,.06)}
+    @media (prefers-color-scheme:dark){:root{--bg:#1a1a1e;--panel:#232328;--line:#33333a;--text:#f0f0f3;--muted:#b9b9c2;--shadow:none}}
     *{box-sizing:border-box}
-    body{margin:0;background:radial-gradient(circle at 15% 20%,#1a2749 0,#0a1020 38%,#060912 100%);color:var(--text);font-family:Arial,sans-serif;min-height:100vh}
-    .wrap{max-width:1140px;margin:28px auto;padding:0 14px}
-    .hero{display:flex;justify-content:space-between;gap:14px;align-items:center;background:linear-gradient(135deg,#121f3d,#0d162d);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
-    .hero h1{margin:0;font-size:24px;letter-spacing:.2px}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:"Comic Relief","Comic Sans MS",Arial,sans-serif;min-height:100vh}
+    .wrap{max-width:1080px;margin:20px auto;padding:0 14px}
+    .hero{display:flex;justify-content:space-between;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px}
+    .hero h1{margin:0;font-size:26px;letter-spacing:.1px}
     .hero p{margin:6px 0 0;color:var(--muted);font-size:14px}
     .stats{display:flex;gap:8px;flex-wrap:wrap}
-    .pill{background:#0a1328;border:1px solid #274173;border-radius:999px;padding:6px 11px;font-size:13px}
+    .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-size:13px}
     .mode{display:flex;gap:8px;margin:16px 0}
-    .mode button{border:1px solid #35558d;background:#0e1a34;color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700}
-    .mode button.active{background:linear-gradient(135deg,#2f4f8f,#274178);border-color:#4f78c6}
+    .mode button{border:1px solid var(--line);background:var(--panel);color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700}
+    .mode button.active{background:#ece8ff;border-color:#b9abff;color:#3f2fa2}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-    .card{background:linear-gradient(160deg,#10192e,#0a1224);border:1px solid var(--line);border-radius:14px;padding:14px}
-    .title{font-size:18px;font-weight:800;margin:0 0 10px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+    .title{font-size:19px;font-weight:800;margin:0 0 10px}
     label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-    textarea,input,select{width:100%;background:#070f20;border:1px solid #2c436d;color:var(--text);border-radius:10px;padding:10px;font:inherit}
+    textarea,input,select{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px;font:inherit}
     textarea{min-height:110px;resize:vertical}
     .row{display:flex;gap:10px}
     .row>*{flex:1}
-    .btn{margin-top:10px;border:1px solid #4972be;background:linear-gradient(135deg,#2d4f90,#243f74);color:#fff;font-weight:700;padding:10px 13px;border-radius:10px;cursor:pointer}
-    .btn.alt{background:linear-gradient(135deg,#2b6f53,#22533f);border-color:#3b966f}
-    .btn.warn{background:linear-gradient(135deg,#86633a,#6d4c2b);border-color:#ab8149}
+    .btn{margin-top:10px;border:1px solid #c9b978;background:#f2e8be;color:#3b3318;font-weight:700;padding:10px 13px;border-radius:10px;cursor:pointer}
+    .btn.alt{background:#d2f0df;border-color:#9dd4b6;color:#214a34}
+    .btn.warn{background:#f6ddc8;border-color:#e2b48a;color:#5d3414}
     .btn:disabled{opacity:.55;cursor:not-allowed}
     .status{margin-top:10px;font-size:13px;color:var(--muted);min-height:18px}
     .good{color:var(--good)}
     .warnc{color:var(--warn)}
-    #responseBox{margin-top:10px;border:1px solid #29406a;border-radius:10px;padding:10px;min-height:86px;background:#070f1e}
-    #responseImage{max-width:100%;border-radius:10px;border:1px solid #2a426e;display:none}
-    #taskBox{border:1px dashed #3d5f9f;padding:10px;border-radius:10px;background:#0a1328;min-height:120px}
+    #responseBox{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px;min-height:86px;background:var(--panel)}
+    #responseImage{max-width:100%;border-radius:10px;border:1px solid var(--line);display:none}
+    #taskBox{border:1px dashed var(--line);padding:10px;border-radius:10px;background:var(--panel);min-height:120px}
     #taskPrompt{white-space:pre-wrap;line-height:1.35}
     #timer{font-size:18px;font-weight:800;margin:8px 0 0}
     .hidden{display:none}
-    #draw{width:100%;height:270px;background:#fff;border-radius:10px;border:1px solid #1f3357;cursor:crosshair;display:none}
+    #draw{width:100%;height:270px;background:#fff;border-radius:10px;border:1px solid var(--line);cursor:crosshair;display:none}
     #drawTools{display:none;gap:8px;margin-top:8px}
     #drawTools input{max-width:92px}
     @media (max-width:940px){.grid{grid-template-columns:1fr}.hero{flex-direction:column;align-items:flex-start}}
@@ -55,6 +57,8 @@
         <div class="pill">Credits: <b id="credits">0</b>/10</div>
         <div class="pill">Refill: <b id="refill">ready</b></div>
         <div class="pill">Mode: <b id="modeLabel">human</b></div>
+        <div class="pill">Larpers: <b id="larpers">0</b></div>
+        <div class="pill">Queue: <b id="queueCount">0</b></div>
       </div>
     </div>
     <div class="mode">
@@ -134,6 +138,8 @@
         credits: qs("#credits"),
         refill: qs("#refill"),
         modeLabel: qs("#modeLabel"),
+        larpers: qs("#larpers"),
+        queueCount: qs("#queueCount"),
         modePrompt: qs("#modePrompt"),
         modeLarp: qs("#modeLarp"),
         promptCard: qs("#promptCard"),
@@ -199,11 +205,19 @@
           el.refill.textContent = "ready";
         }
       }
+      function updateStats(stats) {
+        const larpers = Number(stats?.larpers || 0);
+        const waiting = Number(stats?.waiting || 0);
+        const assigned = Number(stats?.assigned || 0);
+        el.larpers.textContent = String(Math.max(0, larpers));
+        el.queueCount.textContent = String(Math.max(0, waiting + assigned));
+      }
       async function bootstrap() {
         const data = await api("aislop_bootstrap", { userId: state.userId });
         state.userId = data.userId;
         localStorage.setItem(storageKey, state.userId);
         updateCredits(data.credits, data.retryAfterMs);
+        updateStats(data.stats);
       }
       async function pushPresence() {
         if (!state.userId) return;
@@ -216,6 +230,7 @@
           if (state.mode === "larp" && data?.task) {
             loadTask(data.task);
           }
+          updateStats(data?.stats);
         } catch {}
       }
       async function sendPrompt() {
@@ -234,6 +249,7 @@
           state.promptId = data.promptId;
           updateCredits(data.credits, 0);
           setStatus(el.promptStatus, data.status === "assigned" ? "Matched. Waiting for answer..." : "Queued. Waiting for AI larper...", "good");
+          updateStats(data.stats);
           el.responseText.textContent = "Waiting for response...";
           el.responseImage.style.display = "none";
           startPromptPolling();
@@ -266,6 +282,7 @@
             } else {
               setStatus(el.promptStatus, data.status === "assigned" ? "AI larper is writing..." : "Still in queue...");
             }
+            updateStats(data.stats);
           } catch {}
         }, 2000);
       }
@@ -297,6 +314,7 @@
           try {
             const data = await api("aislop_responder_poll", { userId: state.userId });
             if (data?.task) loadTask(data.task);
+            updateStats(data?.stats);
           } catch {}
         }, 1600);
       }
