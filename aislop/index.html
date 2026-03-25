@@ -251,18 +251,24 @@
       function setLarpWaiting(position = 0) {
         const pos = Math.max(1, Number(position || 1));
         el.larpQueuePos.textContent = String(pos);
+        const suffix = pos === 1 ? "st" : pos === 2 ? "nd" : pos === 3 ? "rd" : "th";
+        const queueSub = el.larpQueueBox.querySelector(".queueSub");
+        if (queueSub) queueSub.textContent = `You're ${pos}${suffix} in queue. Waiting for a prompt assignment...`;
         el.larpQueueBox.style.display = "block";
         el.thinkingRow.style.display = "none";
         el.taskBox.style.display = "none";
         el.textResponder.style.display = "none";
         el.imageResponder.style.display = "none";
         el.submitReply.style.display = "none";
+        el.larpStatus.style.display = "none";
+        setStatus(el.larpStatus, "");
       }
       function setLarpActiveTask() {
         el.larpQueueBox.style.display = "none";
         el.thinkingRow.style.display = "flex";
         el.taskBox.style.display = "block";
         el.submitReply.style.display = "inline-block";
+        el.larpStatus.style.display = "block";
       }
       async function bootstrap() {
         const data = await api("aislop_bootstrap", { userId: state.userId });
@@ -418,7 +424,6 @@
           el.timer.textContent = `${left}s`;
           if (left <= 0) {
             el.submitReply.disabled = true;
-            setStatus(el.larpStatus, "Time up. Waiting for next prompt...", "warnc");
             state.currentTask = null;
             setLarpWaiting(1);
           }
