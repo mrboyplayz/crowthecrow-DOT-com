@@ -111,9 +111,6 @@
       </section>
       <section class="card" id="larpCard">
         <h2 class="title">Larp as AI</h2>
-        <div class="row" id="thinkingRow">
-          <label><input type="checkbox" id="thinkingMode"> Thinking mode (150s instead of 75s)</label>
-        </div>
         <div id="larpQueueBox">
           <div class="queueTitle">In queue: #<span id="larpQueuePos">0</span></div>
           <div class="queueSub">Waiting for a prompt assignment...</div>
@@ -182,8 +179,6 @@
         thread: qs("#thread"),
         responseText: qs("#responseText"),
         responseImage: qs("#responseImage"),
-        thinkingMode: qs("#thinkingMode"),
-        thinkingRow: qs("#thinkingRow"),
         larpQueueBox: qs("#larpQueueBox"),
         larpQueuePos: qs("#larpQueuePos"),
         taskPrompt: qs("#taskPrompt"),
@@ -256,7 +251,6 @@
         if (queueSub) queueSub.textContent = `You're ${pos}${suffix} in queue. Waiting for a prompt assignment...`;
         el.timer.textContent = "";
         el.larpQueueBox.style.display = "block";
-        el.thinkingRow.style.display = "none";
         el.taskBox.style.display = "none";
         el.textResponder.style.display = "none";
         el.imageResponder.style.display = "none";
@@ -266,7 +260,6 @@
       }
       function setLarpActiveTask() {
         el.larpQueueBox.style.display = "none";
-        el.thinkingRow.style.display = "flex";
         el.taskBox.style.display = "block";
         el.submitReply.style.display = "inline-block";
         el.larpStatus.style.display = "block";
@@ -284,7 +277,7 @@
           const data = await api("aislop_presence", {
             userId: state.userId,
             mode: state.mode,
-            thinking: !!el.thinkingMode.checked
+            thinking: false
           });
           if (state.mode === "larp" && data?.task) {
             loadTask(data.task);
@@ -510,7 +503,6 @@
         el.modeLarp.addEventListener("click", () => setMode("larp"));
         el.sendPrompt.addEventListener("click", sendPrompt);
         el.submitReply.addEventListener("click", submitTask);
-        el.thinkingMode.addEventListener("change", pushPresence);
       }
       (async () => {
         bind();
