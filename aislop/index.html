@@ -6,44 +6,56 @@
   <title>larp larp larp sahur</title>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Comic+Relief:wght@400;700&display=swap");
-    :root{--bg:#faf9f6;--panel:#ffffff;--line:#d6d0c2;--text:#1a1a1e;--muted:#6d6d74;--hot:#8d3bff;--good:#198754;--warn:#b25f00;--shadow:0 2px 10px rgba(0,0,0,.06)}
-    @media (prefers-color-scheme:dark){:root{--bg:#1a1a1e;--panel:#232328;--line:#33333a;--text:#f0f0f3;--muted:#b9b9c2;--shadow:none}}
+    :root{--bg:#1b1d22;--panel:#1f2229;--line:#373c48;--text:#f0f0f3;--muted:#9ca0ac;--hot:#8d3bff;--good:#34c27b;--warn:#e0a049;--green:#113d2d;--greenline:#2f6f58;--vio:#27263a;--violine:#5b5788}
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:"Comic Relief","Comic Sans MS",Arial,sans-serif;min-height:100vh}
-    .wrap{max-width:1080px;margin:20px auto;padding:0 14px}
-    .hero{display:flex;justify-content:space-between;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px}
+    body{margin:0;background:radial-gradient(circle at 12% 0,#272b35 0,#1b1d22 44%,#17191e 100%);color:var(--text);font-family:"Comic Relief","Comic Sans MS",Arial,sans-serif;min-height:100vh}
+    .wrap{max-width:1080px;margin:16px auto;padding:0 14px}
+    .hero{display:flex;justify-content:space-between;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px 12px 0 0;padding:10px 14px}
     .hero h1{margin:0;font-size:26px;letter-spacing:.1px}
-    .hero p{margin:6px 0 0;color:var(--muted);font-size:14px}
+    .hero p{display:none}
     .stats{display:flex;gap:8px;flex-wrap:wrap}
-    .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-size:13px}
-    .mode{display:flex;gap:8px;margin:16px 0}
-    .mode button{border:1px solid var(--line);background:var(--panel);color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700}
-    .mode button.active{background:#ece8ff;border-color:#b9abff;color:#3f2fa2}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
-    .title{font-size:19px;font-weight:800;margin:0 0 10px}
+    .pill{background:#6a5521;border:1px solid #bfa566;border-radius:2px;padding:3px 8px;font-size:20px;font-weight:700;color:#fff7d6}
+    .stats .pill:nth-child(n+2){display:none}
+    .mode{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0;background:var(--panel);border-left:1px solid var(--line);border-right:1px solid var(--line)}
+    .mode button{border:1px solid var(--line);background:#22252f;color:#9ba1b0;padding:11px 14px;border-radius:0;cursor:pointer;font-weight:700;font-size:38px}
+    .mode button.active{background:#103d2a;border-color:#2f6f58;color:#ffffff}
+    .grid{display:grid;grid-template-columns:1fr;gap:0}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:0;padding:14px}
+    .title{display:none}
     label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-    textarea,input,select{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px;font:inherit}
-    textarea{min-height:110px;resize:vertical}
+    textarea,input,select{width:100%;background:#161922;border:1px solid #3b4151;color:var(--text);border-radius:16px;padding:11px 13px;font:inherit}
+    textarea{min-height:70px;resize:vertical}
     .row{display:flex;gap:10px}
     .row>*{flex:1}
-    .btn{margin-top:10px;border:1px solid #c9b978;background:#f2e8be;color:#3b3318;font-weight:700;padding:10px 13px;border-radius:10px;cursor:pointer}
-    .btn.alt{background:#d2f0df;border-color:#9dd4b6;color:#214a34}
-    .btn.warn{background:#f6ddc8;border-color:#e2b48a;color:#5d3414}
+    .btn{margin-top:10px;border:1px solid #9b8d54;background:#7f6f35;color:#fff8d6;font-weight:700;padding:8px 13px;border-radius:4px;cursor:pointer}
+    .btn.alt{background:#114c2f;border-color:#2f8c5d;color:#dfffe8}
+    .btn.warn{background:#4e1815;border-color:#a7332b;color:#ffbbb5}
     .btn:disabled{opacity:.55;cursor:not-allowed}
     .status{margin-top:10px;font-size:13px;color:var(--muted);min-height:18px}
     .good{color:var(--good)}
     .warnc{color:var(--warn)}
-    #responseBox{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px;min-height:86px;background:var(--panel)}
-    #responseImage{max-width:100%;border-radius:10px;border:1px solid var(--line);display:none}
-    #taskBox{border:1px dashed var(--line);padding:10px;border-radius:10px;background:var(--panel);min-height:120px}
+    #responseBox{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:10px;min-height:360px;background:#1b1e26}
+    #thread{display:flex;flex-direction:column;gap:12px;max-height:56vh;overflow:auto;padding-right:4px}
+    .entryPrompt,.entryResponse{border-radius:18px;padding:10px 12px;line-height:1.35;max-width:84%;font-size:16px}
+    .entryPrompt{margin-left:auto;background:var(--green);border:2px solid var(--greenline)}
+    .entryResponse{margin-right:auto;background:var(--vio);border:2px solid var(--violine)}
+    .entryMeta{font-size:12px;color:#adb1bd;margin-bottom:4px}
+    .entryActions{display:flex;gap:8px;margin-top:8px}
+    .mini{font-size:13px;padding:2px 9px;border-radius:8px;border:1px solid #7740c5;background:#e9ddff;color:#452182}
+    .mini.warn{border-color:#a7332b;background:#300f0d;color:#ff6f64}
+    #responseImage{max-width:100%;border-radius:8px;border:1px solid var(--line);display:none;margin-top:6px}
+    #taskBox{border:1px dashed #4e5465;padding:10px;border-radius:10px;background:#171a23;min-height:120px}
     #taskPrompt{white-space:pre-wrap;line-height:1.35}
     #timer{font-size:18px;font-weight:800;margin:8px 0 0}
     .hidden{display:none}
-    #draw{width:100%;height:270px;background:#fff;border-radius:10px;border:1px solid var(--line);cursor:crosshair;display:none}
+    #draw{width:100%;height:270px;background:#fff;border-radius:8px;border:1px solid var(--line);cursor:crosshair;display:none}
     #drawTools{display:none;gap:8px;margin-top:8px}
     #drawTools input{max-width:92px}
-    @media (max-width:940px){.grid{grid-template-columns:1fr}.hero{flex-direction:column;align-items:flex-start}}
+    #promptCard{border-radius:0 0 12px 12px;display:flex;flex-direction:column;min-height:calc(100vh - 180px)}
+    #promptType{max-width:180px;border-radius:6px;padding:6px 8px}
+    #sendPrompt{align-self:flex-start}
+    .composer{margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
+    @media (max-width:940px){.hero{flex-direction:column;align-items:flex-start}.mode button{font-size:30px}.entryPrompt,.entryResponse{max-width:95%}}
   </style>
 </head>
 <body>
@@ -77,13 +89,16 @@
             </select>
           </div>
         </div>
-        <label for="promptInput">Prompt</label>
-        <textarea id="promptInput" maxlength="2000" placeholder="Ask the AI larper anything..."></textarea>
-        <button class="btn" id="sendPrompt" type="button">Spend 1 credit + send</button>
-        <div class="status" id="promptStatus"></div>
         <div id="responseBox">
+          <div id="thread"></div>
           <div id="responseText">No response yet.</div>
           <img id="responseImage" alt="AI larp response image">
+        </div>
+        <div class="composer">
+          <label for="promptInput">Prompt</label>
+          <textarea id="promptInput" maxlength="2000" placeholder="how many Rs in strawberry?"></textarea>
+          <button class="btn" id="sendPrompt" type="button">write something</button>
+          <div class="status" id="promptStatus"></div>
         </div>
       </section>
       <section class="card" id="larpCard">
@@ -124,6 +139,7 @@
         mode: "prompt",
         credits: 0,
         promptId: "",
+        promptEntries: {},
         promptPollTimer: null,
         larpPollTimer: null,
         presenceTimer: null,
@@ -148,6 +164,7 @@
         promptInput: qs("#promptInput"),
         sendPrompt: qs("#sendPrompt"),
         promptStatus: qs("#promptStatus"),
+        thread: qs("#thread"),
         responseText: qs("#responseText"),
         responseImage: qs("#responseImage"),
         thinkingMode: qs("#thinkingMode"),
@@ -247,9 +264,19 @@
             prompt
           });
           state.promptId = data.promptId;
+          const entry = document.createElement("div");
+          entry.className = "entryPrompt";
+          entry.innerHTML = `<div class="entryMeta">you asked for ${el.promptType.value}</div><div>${prompt.replace(/</g,"&lt;")}</div>`;
+          el.thread.prepend(entry);
+          const answer = document.createElement("div");
+          answer.className = "entryResponse";
+          answer.innerHTML = `<div class="entryMeta">"ai" responded</div><div>thinking...</div>`;
+          el.thread.prepend(answer);
+          state.promptEntries[state.promptId] = answer;
           updateCredits(data.credits, 0);
           setStatus(el.promptStatus, data.status === "assigned" ? "Matched. Waiting for answer..." : "Queued. Waiting for AI larper...", "good");
           updateStats(data.stats);
+          el.promptInput.value = "";
           el.responseText.textContent = "Waiting for response...";
           el.responseImage.style.display = "none";
           startPromptPolling();
@@ -269,6 +296,15 @@
             updateCredits(data.credits, data.retryAfterMs || 0);
             if (data.status === "answered") {
               setStatus(el.promptStatus, "Response received.", "good");
+              const entry = state.promptEntries[state.promptId];
+              if (entry) {
+                if (data.responseType === "image" && data.responseImage) {
+                  entry.innerHTML = `<div class="entryMeta">"ai" responded with drawing</div><img src="${data.responseImage}" alt="response image" style="max-width:100%;border-radius:8px;border:1px solid var(--line)">`;
+                } else {
+                  const safe = String(data.responseText || "(empty response)").replace(/</g, "&lt;");
+                  entry.innerHTML = `<div class="entryMeta">"ai" responded</div><div>${safe}</div><div class="entryActions"><button class="mini" type="button">share</button><button class="mini warn" type="button">report</button></div>`;
+                }
+              }
               if (data.responseType === "image" && data.responseImage) {
                 el.responseImage.src = data.responseImage;
                 el.responseImage.style.display = "block";
