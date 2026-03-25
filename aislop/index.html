@@ -34,9 +34,6 @@
     .status{margin-top:10px;font-size:13px;color:var(--muted);min-height:18px}
     .good{color:var(--good)}
     .warnc{color:var(--warn)}
-    #larpQueueBox{margin-top:8px;border:1px solid #4e5465;border-radius:10px;padding:14px;background:#171a23}
-    #larpQueueBox .queueTitle{font-size:20px;font-weight:700}
-    #larpQueueBox .queueSub{margin-top:8px;color:#c4c9d5}
     #responseBox{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:10px;min-height:470px;background:#1b1e26}
     #thread{display:flex;flex-direction:column;gap:12px;max-height:68vh;overflow:auto;padding-right:4px}
     .entryPrompt,.entryResponse{border-radius:18px;padding:10px 12px;line-height:1.35;max-width:84%;font-size:16px}
@@ -80,8 +77,8 @@
       </div>
     </div>
     <div class="mode">
-      <button id="modePrompt" class="active" type="button">be a human</button>
-      <button id="modeLarp" type="button">larp as ai</button>
+      <button id="modePrompt" class="active" type="button">Prompt AI</button>
+      <button id="modeLarp" type="button">Larp as AI</button>
     </div>
     <div class="grid">
       <section class="card" id="promptCard">
@@ -111,9 +108,8 @@
       </section>
       <section class="card" id="larpCard">
         <h2 class="title">Larp as AI</h2>
-        <div id="larpQueueBox">
-          <div class="queueTitle">In queue: #<span id="larpQueuePos">0</span></div>
-          <div class="queueSub">Waiting for a prompt assignment...</div>
+        <div class="row">
+          <label><input type="checkbox" id="thinkingMode"> Thinking mode (150s instead of 75s)</label>
         </div>
         <div id="taskBox">
           <div class="status">Waiting for prompt assignment...</div>
@@ -179,8 +175,7 @@
         thread: qs("#thread"),
         responseText: qs("#responseText"),
         responseImage: qs("#responseImage"),
-        larpQueueBox: qs("#larpQueueBox"),
-        larpQueuePos: qs("#larpQueuePos"),
+        thinkingMode: qs("#thinkingMode"),
         taskPrompt: qs("#taskPrompt"),
         timer: qs("#timer"),
         textResponder: qs("#textResponder"),
@@ -223,7 +218,6 @@
         } else {
           el.promptCard.style.display = "none";
           el.larpCard.style.display = "block";
-          if (!state.currentTask) setLarpWaiting(1);
         }
         pushPresence();
       }
@@ -243,27 +237,6 @@
         el.larpers.textContent = String(Math.max(0, larpers));
         el.queueCount.textContent = String(Math.max(0, waiting + assigned));
       }
-      function setLarpWaiting(position = 0) {
-        const pos = Math.max(1, Number(position || 1));
-        el.larpQueuePos.textContent = String(pos);
-        const suffix = pos === 1 ? "st" : pos === 2 ? "nd" : pos === 3 ? "rd" : "th";
-        const queueSub = el.larpQueueBox.querySelector(".queueSub");
-        if (queueSub) queueSub.textContent = `You're ${pos}${suffix} in queue. Waiting for a prompt assignment...`;
-        el.timer.textContent = "";
-        el.larpQueueBox.style.display = "block";
-        el.taskBox.style.display = "none";
-        el.textResponder.style.display = "none";
-        el.imageResponder.style.display = "none";
-        el.submitReply.style.display = "none";
-        el.larpStatus.style.display = "none";
-        setStatus(el.larpStatus, "");
-      }
-      function setLarpActiveTask() {
-        el.larpQueueBox.style.display = "none";
-        el.taskBox.style.display = "block";
-        el.submitReply.style.display = "inline-block";
-        el.larpStatus.style.display = "block";
-      }
       async function bootstrap() {
         const data = await api("aislop_bootstrap", { userId: state.userId });
         state.userId = data.userId;
@@ -277,12 +250,10 @@
           const data = await api("aislop_presence", {
             userId: state.userId,
             mode: state.mode,
-            thinking: false
+            thinking: !!el.thinkingMode.checked
           });
           if (state.mode === "larp" && data?.task) {
             loadTask(data.task);
-          } else if (state.mode === "larp" && !state.currentTask) {
-            setLarpWaiting(data?.queuePosition || 1);
           }
           updateStats(data?.stats);
         } catch {}
@@ -373,7 +344,6 @@
         if (!task) return;
         if (state.currentTask && state.currentTask.promptId === task.promptId) return;
         state.currentTask = task;
-        setLarpActiveTask();
         state.deadlineTs = Date.now() + Number(task.timeLimitSec || 75) * 1000;
         el.taskPrompt.textContent = `${task.type.toUpperCase()} prompt:\n${task.prompt}`;
         el.submitReply.disabled = false;
@@ -398,7 +368,6 @@
           try {
             const data = await api("aislop_responder_poll", { userId: state.userId });
             if (data?.task) loadTask(data.task);
-            else if (!state.currentTask) setLarpWaiting(data?.queuePosition || 1);
             updateStats(data?.stats);
           } catch {}
         }, 1600);
@@ -415,13 +384,12 @@
             return;
           }
           const left = Math.max(0, Math.ceil((state.deadlineTs - Date.now()) / 1000));
+          el.timer.textContent = `${left}s`;
           if (left <= 0) {
             el.submitReply.disabled = true;
+            setStatus(el.larpStatus, "Time up. Waiting for next prompt...", "warnc");
             state.currentTask = null;
-            setLarpWaiting(1);
-            return;
           }
-          el.timer.textContent = `${left}s`;
         }, 200);
       }
       async function submitTask() {
@@ -451,7 +419,6 @@
           el.taskPrompt.textContent = "";
           el.timer.textContent = "";
           resetCanvas();
-          setLarpWaiting(1);
         } catch {
           setStatus(el.larpStatus, "Failed to send response.", "warnc");
           el.submitReply.disabled = false;
@@ -503,6 +470,7 @@
         el.modeLarp.addEventListener("click", () => setMode("larp"));
         el.sendPrompt.addEventListener("click", sendPrompt);
         el.submitReply.addEventListener("click", submitTask);
+        el.thinkingMode.addEventListener("change", pushPresence);
       }
       (async () => {
         bind();

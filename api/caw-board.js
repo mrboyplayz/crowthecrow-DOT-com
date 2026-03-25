@@ -413,8 +413,7 @@ export default async function handler(req, res) {
       next[userId] = {
         mode: String(value.mode || "prompt") === "larp" ? "larp" : "prompt",
         thinking: !!value.thinking,
-        ts: seen,
-        joinedAt: Number(value.joinedAt || seen) || seen
+        ts: seen
       };
     }
     return { next, changed };
@@ -477,7 +476,6 @@ export default async function handler(req, res) {
     );
     const larpUsers = Object.entries(presence)
       .filter(([uid, value]) => value?.mode === "larp" && !assignedUsers.has(uid))
-      .sort((a, b) => Number(a?.[1]?.joinedAt || 0) - Number(b?.[1]?.joinedAt || 0))
       .map(([uid]) => uid);
     if (!larpUsers.length) return null;
     const waiting = queue
@@ -493,35 +491,12 @@ export default async function handler(req, res) {
       }
       const eligible = larpUsers.filter(uid => uid !== item.fromUser);
       if (!eligible.length) continue;
-      const pick = eligible[0];
+      const pick = eligible[Math.floor(Math.random() * eligible.length)];
       item.status = "assigned";
       item.assignedTo = pick;
       return item;
     }
     return null;
-  }
-  function buildAislopQueuePosition(queue, presence, userId) {
-    const uid = cleanAislopUser(userId || "");
-    if (!uid) return 0;
-    const self = presence?.[uid];
-    if (!self || self.mode !== "larp") return 0;
-    const assignedUsers = new Set(
-      (Array.isArray(queue) ? queue : [])
-        .filter(item => item?.status === "assigned" && item.assignedTo)
-        .map(item => cleanAislopUser(item.assignedTo))
-    );
-    if (assignedUsers.has(uid)) return 0;
-    const waitingLarpers = Object.entries(presence || {})
-      .filter(([id, value]) => value?.mode === "larp" && !assignedUsers.has(id))
-      .sort((a, b) => {
-        const aj = Number(a?.[1]?.joinedAt || a?.[1]?.ts || 0);
-        const bj = Number(b?.[1]?.joinedAt || b?.[1]?.ts || 0);
-        if (aj !== bj) return aj - bj;
-        return String(a?.[0] || "").localeCompare(String(b?.[0] || ""));
-      })
-      .map(([id]) => id);
-    const index = waitingLarpers.indexOf(uid);
-    return index >= 0 ? index + 1 : 0;
   }
   function formatAislopTask(item, presence) {
     if (!item) return null;
@@ -1040,9 +1015,7 @@ export default async function handler(req, res) {
       ensureAislopUser(users, userId, ts);
       const presenceRaw = (await kvGet(AISLOP_PRESENCE_KEY, {})) || {};
       const { next: presence, changed: presenceChanged } = cleanupAislopPresence(presenceRaw, ts);
-      const prevPresence = presence[userId];
-      const joinedAt = prevPresence && prevPresence.mode === mode ? Number(prevPresence.joinedAt || prevPresence.ts || ts) : ts;
-      presence[userId] = { mode, thinking, ts, joinedAt };
+      presence[userId] = { mode, thinking, ts };
       const queueRaw = (await kvGet(AISLOP_QUEUE_KEY, [])) || [];
       const { queue, changed: queueChanged } = cleanupAislopQueue(queueRaw, presence, ts);
       let assigned = queue.find(item => item.status === "assigned" && item.assignedTo === userId) || null;
@@ -1058,12 +1031,7 @@ export default async function handler(req, res) {
         res.status(500).json({ error: "kv_set_failed" });
         return;
       }
-      res.status(200).json({
-        ok: true,
-        task: formatAislopTask(assigned, presence),
-        stats: buildAislopStats(queue, presence),
-        queuePosition: buildAislopQueuePosition(queue, presence, userId)
-      });
+      res.status(200).json({ ok: true, task: formatAislopTask(assigned, presence), stats: buildAislopStats(queue, presence) });
       return;
     }
     if (req.method === "POST" && action === "aislop_create_prompt") {
@@ -1149,12 +1117,7 @@ export default async function handler(req, res) {
         res.status(500).json({ error: "kv_set_failed" });
         return;
       }
-      res.status(200).json({
-        ok: true,
-        task: formatAislopTask(task, presence),
-        stats: buildAislopStats(queue, presence),
-        queuePosition: buildAislopQueuePosition(queue, presence, userId)
-      });
+      res.status(200).json({ ok: true, task: formatAislopTask(task, presence), stats: buildAislopStats(queue, presence) });
       return;
     }
     if (req.method === "POST" && action === "aislop_submit_response") {
