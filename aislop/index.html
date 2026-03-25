@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>larp larp larp sahur</title>
+  <style>
+    :root{--bg:#080b14;--panel:#101728;--line:#243454;--text:#eaf1ff;--muted:#8ca1cc;--hot:#6f9cff;--good:#6ce3ac;--warn:#ffcc7a}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(circle at 15% 20%,#1a2749 0,#0a1020 38%,#060912 100%);color:var(--text);font-family:Arial,sans-serif;min-height:100vh}
+    .wrap{max-width:1140px;margin:28px auto;padding:0 14px}
+    .hero{display:flex;justify-content:space-between;gap:14px;align-items:center;background:linear-gradient(135deg,#121f3d,#0d162d);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+    .hero h1{margin:0;font-size:24px;letter-spacing:.2px}
+    .hero p{margin:6px 0 0;color:var(--muted);font-size:14px}
+    .stats{display:flex;gap:8px;flex-wrap:wrap}
+    .pill{background:#0a1328;border:1px solid #274173;border-radius:999px;padding:6px 11px;font-size:13px}
+    .mode{display:flex;gap:8px;margin:16px 0}
+    .mode button{border:1px solid #35558d;background:#0e1a34;color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:700}
+    .mode button.active{background:linear-gradient(135deg,#2f4f8f,#274178);border-color:#4f78c6}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .card{background:linear-gradient(160deg,#10192e,#0a1224);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .title{font-size:18px;font-weight:800;margin:0 0 10px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    textarea,input,select{width:100%;background:#070f20;border:1px solid #2c436d;color:var(--text);border-radius:10px;padding:10px;font:inherit}
+    textarea{min-height:110px;resize:vertical}
+    .row{display:flex;gap:10px}
+    .row>*{flex:1}
+    .btn{margin-top:10px;border:1px solid #4972be;background:linear-gradient(135deg,#2d4f90,#243f74);color:#fff;font-weight:700;padding:10px 13px;border-radius:10px;cursor:pointer}
+    .btn.alt{background:linear-gradient(135deg,#2b6f53,#22533f);border-color:#3b966f}
+    .btn.warn{background:linear-gradient(135deg,#86633a,#6d4c2b);border-color:#ab8149}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .status{margin-top:10px;font-size:13px;color:var(--muted);min-height:18px}
+    .good{color:var(--good)}
+    .warnc{color:var(--warn)}
+    #responseBox{margin-top:10px;border:1px solid #29406a;border-radius:10px;padding:10px;min-height:86px;background:#070f1e}
+    #responseImage{max-width:100%;border-radius:10px;border:1px solid #2a426e;display:none}
+    #taskBox{border:1px dashed #3d5f9f;padding:10px;border-radius:10px;background:#0a1328;min-height:120px}
+    #taskPrompt{white-space:pre-wrap;line-height:1.35}
+    #timer{font-size:18px;font-weight:800;margin:8px 0 0}
+    .hidden{display:none}
+    #draw{width:100%;height:270px;background:#fff;border-radius:10px;border:1px solid #1f3357;cursor:crosshair;display:none}
+    #drawTools{display:none;gap:8px;margin-top:8px}
+    #drawTools input{max-width:92px}
+    @media (max-width:940px){.grid{grid-template-columns:1fr}.hero{flex-direction:column;align-items:flex-start}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <h1>/aislop</h1>
+        <p>Prompt humans pretending to be AI, or larp as AI and answer prompts.</p>
+      </div>
+      <div class="stats">
+        <div class="pill">Credits: <b id="credits">0</b>/10</div>
+        <div class="pill">Refill: <b id="refill">ready</b></div>
+        <div class="pill">Mode: <b id="modeLabel">human</b></div>
+      </div>
+    </div>
+    <div class="mode">
+      <button id="modePrompt" class="active" type="button">Prompt AI</button>
+      <button id="modeLarp" type="button">Larp as AI</button>
+    </div>
+    <div class="grid">
+      <section class="card" id="promptCard">
+        <h2 class="title">Send Prompt</h2>
+        <div class="row">
+          <div>
+            <label for="promptType">Requested response type</label>
+            <select id="promptType">
+              <option value="text">Text</option>
+              <option value="image">Image</option>
+            </select>
+          </div>
+        </div>
+        <label for="promptInput">Prompt</label>
+        <textarea id="promptInput" maxlength="2000" placeholder="Ask the AI larper anything..."></textarea>
+        <button class="btn" id="sendPrompt" type="button">Spend 1 credit + send</button>
+        <div class="status" id="promptStatus"></div>
+        <div id="responseBox">
+          <div id="responseText">No response yet.</div>
+          <img id="responseImage" alt="AI larp response image">
+        </div>
+      </section>
+      <section class="card" id="larpCard">
+        <h2 class="title">Larp as AI</h2>
+        <div class="row">
+          <label><input type="checkbox" id="thinkingMode"> Thinking mode (150s instead of 75s)</label>
+        </div>
+        <div id="taskBox">
+          <div class="status">Waiting for prompt assignment...</div>
+          <div id="taskPrompt"></div>
+          <div id="timer"></div>
+        </div>
+        <div id="textResponder">
+          <label for="textReply">Your AI-style text response</label>
+          <textarea id="textReply" maxlength="4000" placeholder="Type response..."></textarea>
+        </div>
+        <div id="imageResponder">
+          <label>Draw image response</label>
+          <canvas id="draw" width="640" height="380"></canvas>
+          <div id="drawTools" class="row">
+            <input id="brushSize" type="number" min="1" max="64" value="5">
+            <button id="clearDraw" class="btn warn" type="button">Clear</button>
+          </div>
+        </div>
+        <button class="btn alt" id="submitReply" type="button" disabled>Send response (+2 credits)</button>
+        <div class="status" id="larpStatus"></div>
+      </section>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const apiBase = (location.hostname === "crowthecrow.com" || location.hostname === "www.crowthecrow.com") ? "https://crowthecrow-dot-com.vercel.app" : "";
+      const endpoint = `${apiBase}/api/caw-board`;
+      const storageKey = "aislop_user_id_v1";
+      const qs = s => document.querySelector(s);
+      const state = {
+        userId: localStorage.getItem(storageKey) || "",
+        mode: "prompt",
+        credits: 0,
+        promptId: "",
+        promptPollTimer: null,
+        larpPollTimer: null,
+        presenceTimer: null,
+        countdownTimer: null,
+        currentTask: null,
+        deadlineTs: 0,
+        drawing: false,
+        lastX: 0,
+        lastY: 0
+      };
+      const el = {
+        credits: qs("#credits"),
+        refill: qs("#refill"),
+        modeLabel: qs("#modeLabel"),
+        modePrompt: qs("#modePrompt"),
+        modeLarp: qs("#modeLarp"),
+        promptCard: qs("#promptCard"),
+        larpCard: qs("#larpCard"),
+        promptType: qs("#promptType"),
+        promptInput: qs("#promptInput"),
+        sendPrompt: qs("#sendPrompt"),
+        promptStatus: qs("#promptStatus"),
+        responseText: qs("#responseText"),
+        responseImage: qs("#responseImage"),
+        thinkingMode: qs("#thinkingMode"),
+        taskPrompt: qs("#taskPrompt"),
+        timer: qs("#timer"),
+        textResponder: qs("#textResponder"),
+        imageResponder: qs("#imageResponder"),
+        textReply: qs("#textReply"),
+        draw: qs("#draw"),
+        drawTools: qs("#drawTools"),
+        clearDraw: qs("#clearDraw"),
+        brushSize: qs("#brushSize"),
+        submitReply: qs("#submitReply"),
+        larpStatus: qs("#larpStatus")
+      };
+      async function api(action, payload = {}) {
+        const res = await fetch(`${endpoint}?action=${encodeURIComponent(action)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        let data = {};
+        try { data = await res.json(); } catch {}
+        if (!res.ok) {
+          const err = new Error(data.error || "request_failed");
+          err.data = data;
+          throw err;
+        }
+        return data;
+      }
+      function setStatus(node, text, cls = "") {
+        node.className = `status ${cls}`.trim();
+        node.textContent = text || "";
+      }
+      function setMode(mode) {
+        state.mode = mode === "larp" ? "larp" : "prompt";
+        el.modePrompt.classList.toggle("active", state.mode === "prompt");
+        el.modeLarp.classList.toggle("active", state.mode === "larp");
+        el.modeLabel.textContent = state.mode === "larp" ? "ai larper" : "human";
+        if (state.mode === "prompt") {
+          el.promptCard.style.display = "block";
+          el.larpCard.style.display = "none";
+        } else {
+          el.promptCard.style.display = "none";
+          el.larpCard.style.display = "block";
+        }
+        pushPresence();
+      }
+      function updateCredits(credits, retryAfterMs = 0) {
+        state.credits = Number(credits || 0);
+        el.credits.textContent = String(state.credits);
+        if (retryAfterMs > 0 && state.credits <= 0) {
+          el.refill.textContent = `${Math.ceil(retryAfterMs / 1000)}s`;
+        } else {
+          el.refill.textContent = "ready";
+        }
+      }
+      async function bootstrap() {
+        const data = await api("aislop_bootstrap", { userId: state.userId });
+        state.userId = data.userId;
+        localStorage.setItem(storageKey, state.userId);
+        updateCredits(data.credits, data.retryAfterMs);
+      }
+      async function pushPresence() {
+        if (!state.userId) return;
+        try {
+          const data = await api("aislop_presence", {
+            userId: state.userId,
+            mode: state.mode,
+            thinking: !!el.thinkingMode.checked
+          });
+          if (state.mode === "larp" && data?.task) {
+            loadTask(data.task);
+          }
+        } catch {}
+      }
+      async function sendPrompt() {
+        const prompt = el.promptInput.value.trim();
+        if (!prompt) {
+          setStatus(el.promptStatus, "Type a prompt first.", "warnc");
+          return;
+        }
+        el.sendPrompt.disabled = true;
+        try {
+          const data = await api("aislop_create_prompt", {
+            userId: state.userId,
+            type: el.promptType.value,
+            prompt
+          });
+          state.promptId = data.promptId;
+          updateCredits(data.credits, 0);
+          setStatus(el.promptStatus, data.status === "assigned" ? "Matched. Waiting for answer..." : "Queued. Waiting for AI larper...", "good");
+          el.responseText.textContent = "Waiting for response...";
+          el.responseImage.style.display = "none";
+          startPromptPolling();
+        } catch (err) {
+          const retry = Number(err?.data?.retryAfterMs || 0);
+          updateCredits(err?.data?.credits ?? state.credits, retry);
+          setStatus(el.promptStatus, err?.data?.error === "not_enough_credits" ? "Not enough credits yet." : "Failed to send prompt.", "warnc");
+        }
+        el.sendPrompt.disabled = false;
+      }
+      function startPromptPolling() {
+        if (state.promptPollTimer) clearInterval(state.promptPollTimer);
+        if (!state.promptId) return;
+        state.promptPollTimer = setInterval(async () => {
+          try {
+            const data = await api("aislop_prompt_poll", { userId: state.userId, promptId: state.promptId });
+            updateCredits(data.credits, data.retryAfterMs || 0);
+            if (data.status === "answered") {
+              setStatus(el.promptStatus, "Response received.", "good");
+              if (data.responseType === "image" && data.responseImage) {
+                el.responseImage.src = data.responseImage;
+                el.responseImage.style.display = "block";
+                el.responseText.textContent = "";
+              } else {
+                el.responseImage.style.display = "none";
+                el.responseText.textContent = data.responseText || "(empty response)";
+              }
+              clearInterval(state.promptPollTimer);
+              state.promptPollTimer = null;
+            } else {
+              setStatus(el.promptStatus, data.status === "assigned" ? "AI larper is writing..." : "Still in queue...");
+            }
+          } catch {}
+        }, 2000);
+      }
+      function loadTask(task) {
+        if (!task) return;
+        if (state.currentTask && state.currentTask.promptId === task.promptId) return;
+        state.currentTask = task;
+        state.deadlineTs = Date.now() + Number(task.timeLimitSec || 75) * 1000;
+        el.taskPrompt.textContent = `${task.type.toUpperCase()} prompt:\n${task.prompt}`;
+        el.submitReply.disabled = false;
+        el.textReply.value = "";
+        setStatus(el.larpStatus, "Prompt assigned. Reply before timer hits 0.", "good");
+        if (task.type === "image") {
+          el.imageResponder.style.display = "block";
+          el.draw.style.display = "block";
+          el.drawTools.style.display = "flex";
+          el.textResponder.style.display = "none";
+        } else {
+          el.imageResponder.style.display = "none";
+          el.draw.style.display = "none";
+          el.drawTools.style.display = "none";
+          el.textResponder.style.display = "block";
+        }
+      }
+      function startLarpPolling() {
+        if (state.larpPollTimer) clearInterval(state.larpPollTimer);
+        state.larpPollTimer = setInterval(async () => {
+          if (state.mode !== "larp") return;
+          try {
+            const data = await api("aislop_responder_poll", { userId: state.userId });
+            if (data?.task) loadTask(data.task);
+          } catch {}
+        }, 1600);
+      }
+      function startPresenceLoop() {
+        if (state.presenceTimer) clearInterval(state.presenceTimer);
+        state.presenceTimer = setInterval(pushPresence, 8000);
+      }
+      function startCountdown() {
+        if (state.countdownTimer) clearInterval(state.countdownTimer);
+        state.countdownTimer = setInterval(() => {
+          if (!state.currentTask) {
+            el.timer.textContent = "";
+            return;
+          }
+          const left = Math.max(0, Math.ceil((state.deadlineTs - Date.now()) / 1000));
+          el.timer.textContent = `${left}s`;
+          if (left <= 0) {
+            el.submitReply.disabled = true;
+            setStatus(el.larpStatus, "Time up. Waiting for next prompt...", "warnc");
+            state.currentTask = null;
+          }
+        }, 200);
+      }
+      async function submitTask() {
+        if (!state.currentTask) return;
+        const type = state.currentTask.type === "image" ? "image" : "text";
+        const payload = {
+          userId: state.userId,
+          promptId: state.currentTask.promptId,
+          responseType: type
+        };
+        if (type === "image") {
+          const dataUrl = el.draw.toDataURL("image/png");
+          payload.responseImage = dataUrl;
+        } else {
+          payload.responseText = el.textReply.value.trim();
+        }
+        if ((type === "text" && !payload.responseText) || (type === "image" && !payload.responseImage)) {
+          setStatus(el.larpStatus, "Fill in a response first.", "warnc");
+          return;
+        }
+        el.submitReply.disabled = true;
+        try {
+          const data = await api("aislop_submit_response", payload);
+          updateCredits(data.credits, 0);
+          setStatus(el.larpStatus, "Response sent. +2 credits.", "good");
+          state.currentTask = null;
+          el.taskPrompt.textContent = "";
+          el.timer.textContent = "";
+          resetCanvas();
+        } catch {
+          setStatus(el.larpStatus, "Failed to send response.", "warnc");
+          el.submitReply.disabled = false;
+        }
+      }
+      function canvasPos(evt) {
+        const rect = el.draw.getBoundingClientRect();
+        return {
+          x: (evt.clientX - rect.left) * (el.draw.width / rect.width),
+          y: (evt.clientY - rect.top) * (el.draw.height / rect.height)
+        };
+      }
+      function resetCanvas() {
+        const ctx = el.draw.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, el.draw.width, el.draw.height);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+      }
+      function setupCanvas() {
+        const ctx = el.draw.getContext("2d");
+        resetCanvas();
+        const down = e => {
+          state.drawing = true;
+          const p = canvasPos(e);
+          state.lastX = p.x;
+          state.lastY = p.y;
+        };
+        const move = e => {
+          if (!state.drawing) return;
+          const p = canvasPos(e);
+          ctx.strokeStyle = "#111111";
+          ctx.lineWidth = Math.max(1, Math.min(64, Number(el.brushSize.value || 5)));
+          ctx.beginPath();
+          ctx.moveTo(state.lastX, state.lastY);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+          state.lastX = p.x;
+          state.lastY = p.y;
+        };
+        const up = () => state.drawing = false;
+        el.draw.addEventListener("mousedown", down);
+        el.draw.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", up);
+        el.clearDraw.addEventListener("click", resetCanvas);
+      }
+      function bind() {
+        el.modePrompt.addEventListener("click", () => setMode("prompt"));
+        el.modeLarp.addEventListener("click", () => setMode("larp"));
+        el.sendPrompt.addEventListener("click", sendPrompt);
+        el.submitReply.addEventListener("click", submitTask);
+        el.thinkingMode.addEventListener("change", pushPresence);
+      }
+      (async () => {
+        bind();
+        setupCanvas();
+        setMode("prompt");
+        await bootstrap();
+        await pushPresence();
+        startLarpPolling();
+        startPresenceLoop();
+        startCountdown();
+      })();
+    })();
+  </script>
+</body>
+</html>

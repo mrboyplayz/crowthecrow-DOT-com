@@ -61,6 +61,9 @@ export default async function handler(req, res) {
   const CAPTCHA_QUIZ_KEY_PREFIX = "caw_captcha_quiz_v1:";
   const CAPTCHA_PASS_KEY_PREFIX = "caw_captcha_pass_v1:";
   const COMMENT_RATE_KEY_PREFIX = "caw_comment_rate_v1:";
+  const AISLOP_USERS_KEY = "aislop_users_v1";
+  const AISLOP_QUEUE_KEY = "aislop_queue_v1";
+  const AISLOP_PRESENCE_KEY = "aislop_presence_v1";
   const MEDIA_MAX_CHARS = 900000;
   const MAX_ACCOUNTS_PER_IP = 3;
   const COMMENT_BURST_COUNT = 4;
@@ -68,6 +71,15 @@ export default async function handler(req, res) {
   const CAPTCHA_TTL_MS = 5 * 60 * 1000;
   const CAPTCHA_PASS_TTL_MS = 5 * 60 * 1000;
   const CAPTCHA_QUIZ_COUNT = 5;
+  const AISLOP_INITIAL_CREDITS = 1;
+  const AISLOP_FREE_CREDITS = 2;
+  const AISLOP_MAX_CREDITS = 10;
+  const AISLOP_REFILL_MS = 10 * 60 * 1000;
+  const AISLOP_PROMPT_COST = 1;
+  const AISLOP_RESPONDER_REWARD = 2;
+  const AISLOP_PRESENCE_TTL_MS = 60 * 1000;
+  const AISLOP_WAITING_TTL_MS = 30 * 60 * 1000;
+  const AISLOP_ANSWERED_TTL_MS = 20 * 60 * 1000;
   const CAPTCHA_QUESTIONS = [
     { prompt: "Who is this SMLWIKI Character?", image: "/smlwiki/jerryshop/jerry.png", answers: ["jerry"], hint: "look at his shirt, different from the other lookalike" },
     { prompt: "Who is this SML Character?", image: "/caw-content/Jeffy.webp", answers: ["jeffy"], hint: "he seems retarded" },
@@ -140,7 +152,7 @@ export default async function handler(req, res) {
   const CAW_BOARD_CLOSED = false;
   const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const action = u.searchParams.get("action") || "";
-  const closedAllowActions = new Set(["embed", "proxy", "captcha", "quiz_start", "quiz_answer", "login", "session", "site_status", "admin_set_site_status", "admin_wipe_non_admin", "admin_wipe_users_without_posts", "admin_ip_ban_user"]);
+  const closedAllowActions = new Set(["embed", "proxy", "captcha", "quiz_start", "quiz_answer", "login", "session", "site_status", "admin_set_site_status", "admin_wipe_non_admin", "admin_wipe_users_without_posts", "admin_ip_ban_user", "aislop_bootstrap", "aislop_presence", "aislop_create_prompt", "aislop_responder_poll", "aislop_submit_response", "aislop_prompt_poll"]);
   if (CAW_BOARD_CLOSED) {
     if (req.method === "GET" && action === "embed") {
       res.status(503).setHeader("Content-Type", "text/html; charset=utf-8");
@@ -340,6 +352,165 @@ export default async function handler(req, res) {
   }
   function commentRateKey(user) {
     return `${COMMENT_RATE_KEY_PREFIX}${cleanUser(user)}`;
+  }
+  function cleanAislopUser(value) {
+    return String(value || "").trim().slice(0, 96).replace(/[^\w.-]/g, "");
+  }
+  function cleanAislopText(value, limit = 1000) {
+    return String(value || "").trim().slice(0, limit).replace(/\0/g, "");
+  }
+  function normalizeAislopType(value) {
+    return String(value || "").toLowerCase() === "image" ? "image" : "text";
+  }
+  function ensureAislopUser(users, userId, ts) {
+    if (!users[userId] || typeof users[userId] !== "object") {
+      users[userId] = {
+        credits: AISLOP_INITIAL_CREDITS,
+        created: ts,
+        lastRefill: ts
+      };
+    }
+    const current = users[userId];
+    const credits = Number(current.credits || 0);
+    const lastRefill = Number(current.lastRefill || ts);
+    current.credits = Number.isFinite(credits) ? Math.max(0, Math.min(AISLOP_MAX_CREDITS, Math.floor(credits))) : AISLOP_INITIAL_CREDITS;
+    current.lastRefill = Number.isFinite(lastRefill) ? lastRefill : ts;
+    if (!Number.isFinite(Number(current.created))) current.created = ts;
+    return current;
+  }
+  function applyAislopRefill(user, ts) {
+    if (!user || typeof user !== "object") return false;
+    const credits = Number(user.credits || 0);
+    if (credits > 0 || credits >= AISLOP_MAX_CREDITS) return false;
+    const lastRefill = Number(user.lastRefill || ts);
+    const elapsed = ts - lastRefill;
+    if (!Number.isFinite(elapsed) || elapsed < AISLOP_REFILL_MS) return false;
+    const steps = Math.floor(elapsed / AISLOP_REFILL_MS);
+    if (steps <= 0) return false;
+    user.credits = Math.min(AISLOP_MAX_CREDITS, credits + steps * AISLOP_FREE_CREDITS);
+    user.lastRefill = lastRefill + steps * AISLOP_REFILL_MS;
+    return true;
+  }
+  function aisLopRetryMs(user, ts) {
+    if (!user || Number(user.credits || 0) > 0) return 0;
+    const lastRefill = Number(user.lastRefill || ts);
+    return Math.max(0, AISLOP_REFILL_MS - (ts - lastRefill));
+  }
+  function cleanupAislopPresence(rawPresence, ts) {
+    const next = {};
+    let changed = false;
+    if (!rawPresence || typeof rawPresence !== "object" || Array.isArray(rawPresence)) return { next, changed: !!rawPresence };
+    for (const [userId, value] of Object.entries(rawPresence)) {
+      if (!value || typeof value !== "object") {
+        changed = true;
+        continue;
+      }
+      const seen = Number(value.ts || 0);
+      if (!Number.isFinite(seen) || ts - seen > AISLOP_PRESENCE_TTL_MS) {
+        changed = true;
+        continue;
+      }
+      next[userId] = {
+        mode: String(value.mode || "prompt") === "larp" ? "larp" : "prompt",
+        thinking: !!value.thinking,
+        ts: seen
+      };
+    }
+    return { next, changed };
+  }
+  function cleanupAislopQueue(rawQueue, presence, ts) {
+    const queue = Array.isArray(rawQueue) ? rawQueue : [];
+    const cleaned = [];
+    let changed = !Array.isArray(rawQueue);
+    for (const item of queue) {
+      if (!item || typeof item !== "object") {
+        changed = true;
+        continue;
+      }
+      const created = Number(item.created || 0);
+      if (!Number.isFinite(created)) {
+        changed = true;
+        continue;
+      }
+      const status = String(item.status || "waiting");
+      const isAnswered = status === "answered";
+      const ttl = isAnswered ? AISLOP_ANSWERED_TTL_MS : AISLOP_WAITING_TTL_MS;
+      if (ts - created > ttl) {
+        changed = true;
+        continue;
+      }
+      const next = {
+        id: String(item.id || makeId()),
+        fromUser: cleanAislopUser(item.fromUser || ""),
+        type: normalizeAislopType(item.type),
+        prompt: cleanAislopText(item.prompt || "", 2000),
+        created,
+        status: isAnswered ? "answered" : (status === "assigned" ? "assigned" : "waiting"),
+        assignedTo: cleanAislopUser(item.assignedTo || ""),
+        answeredAt: Number(item.answeredAt || 0) || 0,
+        responseType: normalizeAislopType(item.responseType),
+        responseText: cleanAislopText(item.responseText || "", 4000),
+        responseImage: cleanAislopText(item.responseImage || "", MEDIA_MAX_CHARS)
+      };
+      if (!next.fromUser || !next.prompt) {
+        changed = true;
+        continue;
+      }
+      if (next.status === "assigned") {
+        const activePresence = presence[next.assignedTo];
+        if (!next.assignedTo || !activePresence || activePresence.mode !== "larp") {
+          next.status = "waiting";
+          next.assignedTo = "";
+          changed = true;
+        }
+      }
+      cleaned.push(next);
+    }
+    return { queue: cleaned, changed };
+  }
+  function assignAislopPrompt(queue, presence, responderUser) {
+    const assignedUsers = new Set(
+      queue
+        .filter(item => item.status === "assigned" && item.assignedTo)
+        .map(item => item.assignedTo)
+    );
+    const larpUsers = Object.entries(presence)
+      .filter(([uid, value]) => value?.mode === "larp" && !assignedUsers.has(uid))
+      .map(([uid]) => uid);
+    if (!larpUsers.length) return null;
+    const waiting = queue
+      .filter(item => item.status === "waiting")
+      .sort((a, b) => Number(a.created || 0) - Number(b.created || 0));
+    if (!waiting.length) return null;
+    for (const item of waiting) {
+      if (responderUser) {
+        if (item.fromUser === responderUser) continue;
+        item.status = "assigned";
+        item.assignedTo = responderUser;
+        return item;
+      }
+      const eligible = larpUsers.filter(uid => uid !== item.fromUser);
+      if (!eligible.length) continue;
+      const pick = eligible[Math.floor(Math.random() * eligible.length)];
+      item.status = "assigned";
+      item.assignedTo = pick;
+      return item;
+    }
+    return null;
+  }
+  function formatAislopTask(item, presence) {
+    if (!item) return null;
+    const responderPresence = presence?.[item.assignedTo];
+    const thinking = !!responderPresence?.thinking;
+    return {
+      id: item.id,
+      promptId: item.id,
+      prompt: item.prompt,
+      type: item.type,
+      created: item.created,
+      timeLimitSec: thinking ? 150 : 75,
+      thinkingMode: thinking
+    };
   }
   function isStoredMedia(urlField) {
     return String(urlField || "").startsWith("kv:");
@@ -788,6 +959,231 @@ export default async function handler(req, res) {
     }
     if (req.method === "GET" && action === "site_status") {
       res.status(200).json({ ok: true, closed: siteClosed, reason: siteReason });
+      return;
+    }
+    if (req.method === "POST" && action === "aislop_bootstrap") {
+      const userId = cleanAislopUser(body?.userId || "") || makeId();
+      const ts = now();
+      const users = (await kvGet(AISLOP_USERS_KEY, {})) || {};
+      const user = ensureAislopUser(users, userId, ts);
+      const changed = applyAislopRefill(user, ts);
+      if (changed) {
+        const okUsers = await kvSet(AISLOP_USERS_KEY, users);
+        if (!okUsers) {
+          res.status(500).json({ error: "kv_set_failed" });
+          return;
+        }
+      }
+      res.status(200).json({
+        ok: true,
+        userId,
+        credits: Number(user.credits || 0),
+        maxCredits: AISLOP_MAX_CREDITS,
+        retryAfterMs: aisLopRetryMs(user, ts)
+      });
+      return;
+    }
+    if (req.method === "POST" && action === "aislop_presence") {
+      const userId = cleanAislopUser(body?.userId || "");
+      const mode = String(body?.mode || "") === "larp" ? "larp" : "prompt";
+      const thinking = !!body?.thinking;
+      if (!userId) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const ts = now();
+      const users = (await kvGet(AISLOP_USERS_KEY, {})) || {};
+      ensureAislopUser(users, userId, ts);
+      const presenceRaw = (await kvGet(AISLOP_PRESENCE_KEY, {})) || {};
+      const { next: presence, changed: presenceChanged } = cleanupAislopPresence(presenceRaw, ts);
+      presence[userId] = { mode, thinking, ts };
+      const queueRaw = (await kvGet(AISLOP_QUEUE_KEY, [])) || [];
+      const { queue, changed: queueChanged } = cleanupAislopQueue(queueRaw, presence, ts);
+      let assigned = queue.find(item => item.status === "assigned" && item.assignedTo === userId) || null;
+      let assignedNow = false;
+      if (!assigned && mode === "larp") {
+        assigned = assignAislopPrompt(queue, presence, userId);
+        if (assigned) assignedNow = true;
+      }
+      const okUsers = await kvSet(AISLOP_USERS_KEY, users);
+      const okPresence = await kvSet(AISLOP_PRESENCE_KEY, presence);
+      const okQueue = (queueChanged || assignedNow || presenceChanged) ? await kvSet(AISLOP_QUEUE_KEY, queue) : true;
+      if (!okUsers || !okPresence || !okQueue) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, task: formatAislopTask(assigned, presence) });
+      return;
+    }
+    if (req.method === "POST" && action === "aislop_create_prompt") {
+      const userId = cleanAislopUser(body?.userId || "");
+      const prompt = cleanAislopText(body?.prompt || "", 2000);
+      const type = normalizeAislopType(body?.type || "text");
+      if (!userId || !prompt) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const ts = now();
+      const users = (await kvGet(AISLOP_USERS_KEY, {})) || {};
+      const user = ensureAislopUser(users, userId, ts);
+      applyAislopRefill(user, ts);
+      if (Number(user.credits || 0) < AISLOP_PROMPT_COST) {
+        const okUsers = await kvSet(AISLOP_USERS_KEY, users);
+        if (!okUsers) {
+          res.status(500).json({ error: "kv_set_failed" });
+          return;
+        }
+        res.status(429).json({
+          error: "not_enough_credits",
+          credits: Number(user.credits || 0),
+          retryAfterMs: aisLopRetryMs(user, ts)
+        });
+        return;
+      }
+      user.credits = Math.max(0, Number(user.credits || 0) - AISLOP_PROMPT_COST);
+      const presenceRaw = (await kvGet(AISLOP_PRESENCE_KEY, {})) || {};
+      const { next: presence, changed: presenceChanged } = cleanupAislopPresence(presenceRaw, ts);
+      const queueRaw = (await kvGet(AISLOP_QUEUE_KEY, [])) || [];
+      const { queue } = cleanupAislopQueue(queueRaw, presence, ts);
+      const item = {
+        id: makeId(),
+        fromUser: userId,
+        type,
+        prompt,
+        created: ts,
+        status: "waiting",
+        assignedTo: "",
+        answeredAt: 0,
+        responseType: "text",
+        responseText: "",
+        responseImage: ""
+      };
+      queue.push(item);
+      const assigned = assignAislopPrompt(queue, presence, "");
+      const okUsers = await kvSet(AISLOP_USERS_KEY, users);
+      const okPresence = presenceChanged ? await kvSet(AISLOP_PRESENCE_KEY, presence) : true;
+      const okQueue = await kvSet(AISLOP_QUEUE_KEY, queue);
+      if (!okUsers || !okPresence || !okQueue) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({
+        ok: true,
+        promptId: item.id,
+        credits: Number(user.credits || 0),
+        status: item.status,
+        assigned: !!assigned
+      });
+      return;
+    }
+    if (req.method === "POST" && action === "aislop_responder_poll") {
+      const userId = cleanAislopUser(body?.userId || "");
+      if (!userId) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const ts = now();
+      const users = (await kvGet(AISLOP_USERS_KEY, {})) || {};
+      ensureAislopUser(users, userId, ts);
+      const presenceRaw = (await kvGet(AISLOP_PRESENCE_KEY, {})) || {};
+      const { next: presence, changed: presenceChanged } = cleanupAislopPresence(presenceRaw, ts);
+      const queueRaw = (await kvGet(AISLOP_QUEUE_KEY, [])) || [];
+      const { queue, changed: queueChanged } = cleanupAislopQueue(queueRaw, presence, ts);
+      let task = queue.find(item => item.status === "assigned" && item.assignedTo === userId) || null;
+      let assignedNow = false;
+      if (!task) {
+        task = assignAislopPrompt(queue, presence, userId);
+        if (task) assignedNow = true;
+      }
+      const okUsers = await kvSet(AISLOP_USERS_KEY, users);
+      const okPresence = presenceChanged ? await kvSet(AISLOP_PRESENCE_KEY, presence) : true;
+      const okQueue = (queueChanged || assignedNow) ? await kvSet(AISLOP_QUEUE_KEY, queue) : true;
+      if (!okUsers || !okPresence || !okQueue) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, task: formatAislopTask(task, presence) });
+      return;
+    }
+    if (req.method === "POST" && action === "aislop_submit_response") {
+      const userId = cleanAislopUser(body?.userId || "");
+      const promptId = String(body?.promptId || "");
+      const responseType = normalizeAislopType(body?.responseType || "text");
+      const responseText = cleanAislopText(body?.responseText || "", 4000);
+      const responseImage = cleanAislopText(body?.responseImage || "", MEDIA_MAX_CHARS);
+      if (!userId || !promptId || (responseType === "text" && !responseText) || (responseType === "image" && !responseImage)) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const ts = now();
+      const users = (await kvGet(AISLOP_USERS_KEY, {})) || {};
+      const user = ensureAislopUser(users, userId, ts);
+      applyAislopRefill(user, ts);
+      const presenceRaw = (await kvGet(AISLOP_PRESENCE_KEY, {})) || {};
+      const { next: presence, changed: presenceChanged } = cleanupAislopPresence(presenceRaw, ts);
+      const queueRaw = (await kvGet(AISLOP_QUEUE_KEY, [])) || [];
+      const { queue } = cleanupAislopQueue(queueRaw, presence, ts);
+      const task = queue.find(item => item.id === promptId);
+      if (!task || task.status !== "assigned" || task.assignedTo !== userId) {
+        res.status(404).json({ error: "task_not_found" });
+        return;
+      }
+      task.status = "answered";
+      task.answeredAt = ts;
+      task.responseType = responseType;
+      task.responseText = responseType === "text" ? responseText : "";
+      task.responseImage = responseType === "image" ? responseImage : "";
+      user.credits = Math.min(AISLOP_MAX_CREDITS, Number(user.credits || 0) + AISLOP_RESPONDER_REWARD);
+      const okUsers = await kvSet(AISLOP_USERS_KEY, users);
+      const okPresence = presenceChanged ? await kvSet(AISLOP_PRESENCE_KEY, presence) : true;
+      const okQueue = await kvSet(AISLOP_QUEUE_KEY, queue);
+      if (!okUsers || !okPresence || !okQueue) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      res.status(200).json({ ok: true, credits: Number(user.credits || 0) });
+      return;
+    }
+    if (req.method === "POST" && action === "aislop_prompt_poll") {
+      const userId = cleanAislopUser(body?.userId || "");
+      const promptId = String(body?.promptId || "");
+      if (!userId || !promptId) {
+        res.status(400).json({ error: "bad_request" });
+        return;
+      }
+      const ts = now();
+      const users = (await kvGet(AISLOP_USERS_KEY, {})) || {};
+      const user = ensureAislopUser(users, userId, ts);
+      const changedUsers = applyAislopRefill(user, ts);
+      const presenceRaw = (await kvGet(AISLOP_PRESENCE_KEY, {})) || {};
+      const { next: presence, changed: presenceChanged } = cleanupAislopPresence(presenceRaw, ts);
+      const queueRaw = (await kvGet(AISLOP_QUEUE_KEY, [])) || [];
+      const { queue, changed: queueChanged } = cleanupAislopQueue(queueRaw, presence, ts);
+      const promptItem = queue.find(item => item.id === promptId && item.fromUser === userId);
+      if (!promptItem) {
+        if (changedUsers) await kvSet(AISLOP_USERS_KEY, users);
+        if (presenceChanged) await kvSet(AISLOP_PRESENCE_KEY, presence);
+        if (queueChanged) await kvSet(AISLOP_QUEUE_KEY, queue);
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      const okUsers = changedUsers ? await kvSet(AISLOP_USERS_KEY, users) : true;
+      const okPresence = presenceChanged ? await kvSet(AISLOP_PRESENCE_KEY, presence) : true;
+      const okQueue = queueChanged ? await kvSet(AISLOP_QUEUE_KEY, queue) : true;
+      if (!okUsers || !okPresence || !okQueue) {
+        res.status(500).json({ error: "kv_set_failed" });
+        return;
+      }
+      const status = String(promptItem.status || "waiting");
+      res.status(200).json({
+        ok: true,
+        status,
+        credits: Number(user.credits || 0),
+        retryAfterMs: aisLopRetryMs(user, ts),
+        responseType: status === "answered" ? promptItem.responseType : "",
+        responseText: status === "answered" ? promptItem.responseText : "",
+        responseImage: status === "answered" ? promptItem.responseImage : ""
+      });
       return;
     }
     if (req.method === "POST" && action === "signup") {
