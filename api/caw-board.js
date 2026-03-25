@@ -1109,15 +1109,10 @@ export default async function handler(req, res) {
       const { next: presence, changed: presenceChanged } = cleanupAislopPresence(presenceRaw, ts);
       const queueRaw = (await kvGet(AISLOP_QUEUE_KEY, [])) || [];
       const { queue, changed: queueChanged } = cleanupAislopQueue(queueRaw, presence, ts);
-      let task = queue.find(item => item.status === "assigned" && item.assignedTo === userId) || null;
-      let assignedNow = false;
-      if (!task) {
-        task = assignAislopPrompt(queue, presence, userId);
-        if (task) assignedNow = true;
-      }
+      const task = queue.find(item => item.status === "assigned" && item.assignedTo === userId) || null;
       const okUsers = await kvSet(AISLOP_USERS_KEY, users);
       const okPresence = presenceChanged ? await kvSet(AISLOP_PRESENCE_KEY, presence) : true;
-      const okQueue = (queueChanged || assignedNow) ? await kvSet(AISLOP_QUEUE_KEY, queue) : true;
+      const okQueue = queueChanged ? await kvSet(AISLOP_QUEUE_KEY, queue) : true;
       if (!okUsers || !okPresence || !okQueue) {
         res.status(500).json({ error: "kv_set_failed" });
         return;

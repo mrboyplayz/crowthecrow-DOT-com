@@ -155,6 +155,9 @@
         lastX: 0,
         lastY: 0
       };
+      function scrollThreadToBottom() {
+        el.thread.scrollTop = el.thread.scrollHeight;
+      }
       const el = {
         credits: qs("#credits"),
         refill: qs("#refill"),
@@ -257,6 +260,10 @@
       }
       async function sendPrompt() {
         const prompt = el.promptInput.value.trim();
+        if (state.promptId) {
+          setStatus(el.promptStatus, "You already have one active prompt in queue.", "warnc");
+          return;
+        }
         if (!prompt) {
           setStatus(el.promptStatus, "Type a prompt first.", "warnc");
           return;
@@ -278,15 +285,16 @@
           entry.innerHTML = `<div class="entryMeta">you asked for ${el.promptType.value}</div><div>${prompt.replace(/</g,"&lt;")}</div>`;
           const answer = document.createElement("div");
           answer.className = "entryResponse";
-          answer.innerHTML = `<div class="entryMeta">"ai" responded</div><div>thinking...</div>`;
+          answer.innerHTML = `<div class="entryMeta">"ai" is thinking</div><div>thinking...</div>`;
           pair.append(entry, answer);
-          el.thread.prepend(pair);
+          el.thread.append(pair);
+          scrollThreadToBottom();
           state.promptEntries[state.promptId] = answer;
           updateCredits(data.credits, 0);
           setStatus(el.promptStatus, data.status === "assigned" ? "Matched. Waiting for answer..." : "Queued. Waiting for AI larper...", "good");
           updateStats(data.stats);
           el.promptInput.value = "";
-          el.responseText.textContent = "Waiting for response...";
+          el.responseText.textContent = "";
           el.responseImage.style.display = "none";
           startPromptPolling();
         } catch (err) {
@@ -314,21 +322,22 @@
                   entry.innerHTML = `<div class="entryMeta">"ai" responded</div><div>${safe}</div><div class="entryActions"><button class="mini" type="button">share</button><button class="mini warn" type="button">report</button></div>`;
                 }
               }
-              if (data.responseType === "image" && data.responseImage) {
-                el.responseImage.src = data.responseImage;
-                el.responseImage.style.display = "block";
-                el.responseText.textContent = "";
-              } else {
-                el.responseImage.style.display = "none";
-                el.responseText.textContent = data.responseText || "(empty response)";
-              }
+              el.responseImage.style.display = "none";
+              el.responseText.textContent = "";
               clearInterval(state.promptPollTimer);
               state.promptPollTimer = null;
+              delete state.promptEntries[state.promptId];
+              state.promptId = "";
+              scrollThreadToBottom();
             } else {
               setStatus(el.promptStatus, data.status === "assigned" ? "AI larper is writing..." : "Still in queue...");
             }
             updateStats(data.stats);
-          } catch {}
+          } catch {
+            clearInterval(state.promptPollTimer);
+            state.promptPollTimer = null;
+            state.promptId = "";
+          }
         }, 2000);
       }
       function loadTask(task) {
